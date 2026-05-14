@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    译人 (Yiren) adaptive icon background — Siri-style iridescent orb gradient.
+    Three overlapping radial gradients (violet → pink → cyan) blended with
+    additive alpha, on a deep purple base. This produces the same "soft
+    glassy AI sphere" look as Siri / Doubao voice mode.
+    Adaptive icon viewport is 108×108; launcher safe zone is 66×66 centered.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Base deep gradient -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#1A0E3A"
+                android:centerColor="#3A1B7A"
+                android:endColor="#0E0826" />
+        </shape>
+    </item>
+
+    <!-- Violet glow blob (top-left) -->
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="60"
+                android:centerX="0.32"
+                android:centerY="0.32"
+                android:startColor="#CC8E5CFF"
+                android:endColor="#008E5CFF" />
+            <size android:width="108dp" android:height="108dp" />
+        </shape>
+    </item>
+
+    <!-- Pink glow blob (bottom-right) -->
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="55"
+                android:centerX="0.72"
+                android:centerY="0.78"
+                android:startColor="#BBFF5FA0"
+                android:endColor="#00FF5FA0" />
+            <size android:width="108dp" android:height="108dp" />
+        </shape>
+    </item>
+
+    <!-- Cyan glow blob (right-middle) -->
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="55"
+                android:centerX="0.85"
+                android:centerY="0.40"
+                android:startColor="#993DD9FF"
+                android:endColor="#003DD9FF" />
+            <size android:width="108dp" android:height="108dp" />
+        </shape>
+    </item>
+
+    <!-- Specular highlight (top-left) for the glossy look -->
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="36"
+                android:centerX="0.30"
+                android:centerY="0.25"
+                android:startColor="#80FFFFFF"
+                android:endColor="#00FFFFFF" />
+            <size android:width="108dp" android:height="108dp" />
+        </shape>
+    </item>
+
+</layer-list>

@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "skills": {
+    "memory-kotlin-sharedflow-pitfall": {
+      "skillName": "memory-kotlin-sharedflow-pitfall",
+      "skillType": "personal",
+      "currentVersion": "v1",
+      "totalEvents": 1,
+      "history": [
+        {
+          "id": "evt_1778601325882_oui7v1",
+          "timestamp": "2026-05-12T15:55:25.882Z",
+          "operation": "create",
+          "trigger": "review_session",
+          "sessionId": "skill-review-1778601102352-3276jw",
+          "reason": "Kotlin MutableSharedFlow collector永久挂起陷阱 — 2026-05-12 Offline Translator Vosk ASR调试中发现，MutableSharedFlow无终止信号导致collector永远不退出，改用callbackFlow+close()修复",
+          "contentHash": "9bab859b9e75931d",
+          "version": "v1"
+        }
+      ]
+    },
+    "memory-kotlin-stateflow-race": {
+      "skillName": "memory-kotlin-stateflow-race",
+      "skillType": "personal",
+      "currentVersion": "v1",
+      "totalEvents": 1,
+      "history": [
+        {
+          "id": "evt_1778601325894_cdlxxp",
+          "timestamp": "2026-05-12T15:55:25.894Z",
+          "operation": "create",
+          "trigger": "review_session",
+          "sessionId": "skill-review-1778601102352-3276jw",
+          "reason": "Kotlin StateFlow竞态条件 — 2026-05-12 Offline Translator ChatViewModel中ensureSession()异步launch后send()同步读取_sid.value为null，修复：同步设置值+异步IO",
+          "contentHash": "3600a8d22b93816d",
+          "version": "v1"
+        }
+      ]
+    },
+    "memory-adb-compose-testing": {
+      "skillName": "memory-adb-compose-testing",
+      "skillType": "personal",
+      "currentVersion": "v1",
+      "totalEvents": 1,
+      "history": [
+        {
+          "id": "evt_1778601325905_isj3l7",
+          "timestamp": "2026-05-12T15:55:25.905Z",
+          "operation": "create",
+          "trigger": "review_session",
+          "sessionId": "skill-review-1778601102352-3276jw",
+          "reason": "Android ADB测试Compose UI要点 — 2026-05-12 Offline Translator调试中发现IME切换、引号转义、uiautomator坐标定位等多个坑",
+          "contentHash": "5b46cd59ee8439ee",
+          "version": "v1"
+        }
+      ]
+    }
+  }
+}

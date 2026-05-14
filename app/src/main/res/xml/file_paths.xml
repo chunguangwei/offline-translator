@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths for sharing camera-capture URIs with the camera app.
+    `cache-path` maps internal cache dir, where we save the JPEG written by
+    ActivityResultContracts.TakePicture(uri).
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="camera_captures" path="camera/" />
+    <files-path name="camera_files" path="camera/" />
+</paths>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand -->
+    <color name="brand_primary">#5B9BFF</color>
+    <color name="brand_primary_dark">#3D7BE0</color>
+    <color name="brand_secondary">#A78BFA</color>
+    <color name="brand_secondary_dark">#7C5FE0</color>
+    <color name="brand_tertiary">#22D3B5</color>
+
+    <!-- Light surfaces -->
+    <color name="bg_light">#F7F8FB</color>
+    <color name="surface_light">#FFFFFF</color>
+    <color name="surface_glass_light">#8CFFFFFF</color>
+    <color name="on_surface_light">#0E1118</color>
+    <color name="on_surface_variant_light">#5C6573</color>
+    <color name="outline_light">#22000000</color>
+
+    <!-- Dark surfaces -->
+    <color name="bg_dark">#0E1118</color>
+    <color name="surface_dark">#161A24</color>
+    <color name="surface_glass_dark">#33FFFFFF</color>
+    <color name="on_surface_dark">#F2F4F8</color>
+    <color name="on_surface_variant_dark">#9AA1AF</color>
+    <color name="outline_dark">#33FFFFFF</color>
+
+    <!-- Status -->
+    <color name="status_success">#34D399</color>
+    <color name="status_warning">#FBBF24</color>
+    <color name="status_error">#F87171</color>
+
+    <!-- Gradients (used as start/end stops) -->
+    <color name="gradient_blue_start">#5B9BFF</color>
+    <color name="gradient_blue_end">#A78BFA</color>
+    <color name="gradient_pink_start">#FFB4E1</color>
+    <color name="gradient_pink_end">#FF8FBE</color>
+    <color name="gradient_mint_start">#A8F2D5</color>
+    <color name="gradient_mint_end">#22D3B5</color>
+    <color name="gradient_amber_start">#FFE6A0</color>
+    <color name="gradient_amber_end">#FFB347</color>
+</resources>

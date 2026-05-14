@@ -1,0 +1,99 @@
+package com.offlinetranslator.app.engine.audio
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
+import androidx.annotation.RequiresPermission
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.math.abs
+import kotlin.math.min
+
+/**
+ * 16-kHz mono PCM16 audio recorder. Emits 20ms frames + amplitude updates.
+ */
+@Singleton
+class PcmAudioRecorder @Inject constructor() {
+
+    private val sampleRate = 16_000
+    private val channelConfig = AudioFormat.CHANNEL_IN_MONO
+    private val encoding = AudioFormat.ENCODING_PCM_16BIT
+
+    private var record: AudioRecord? = null
+    private var recordJob: Job? = null
+    private var scope: CoroutineScope? = null
+
+    private val _frames = MutableSharedFlow<ShortArray>(extraBufferCapacity = 256)
+    val frames: SharedFlow<ShortArray> = _frames.asSharedFlow()
+
+    private val _amplitudes = MutableSharedFlow<Float>(extraBufferCapacity = 256)
+    val amplitudes: SharedFlow<Float> = _amplitudes.asSharedFlow()
+
+    private val captured = ByteArrayOutputStream()
+    val isRecording: Boolean get() = record != null
+
+    @SuppressLint("MissingPermission")
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    fun start() {
+        if (record != null) return
+        captured.reset()
+        val minBuf = AudioRecord.getMinBufferSize(sampleRate, channelConfig, encoding)
+        val bufSize = (minBuf * 2).coerceAtLeast(sampleRate / 5) // ~200 ms buffer
+        record = AudioRecord(
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            sampleRate, channelConfig, encoding, bufSize,
+        )
+        record?.startRecording()
+        scope = CoroutineScope(Dispatchers.IO)
+        recordJob = scope?.launch {
+            val frame = ShortArray(sampleRate / 50) // 20 ms
+            while (isActive && record != null) {
+                val read = record?.read(frame, 0, frame.size) ?: -1
+                if (read > 0) {
+                    val copy = frame.copyOf(read)
+                    _frames.tryEmit(copy)
+                    captured.write(shortsToBytesLE(copy))
+                    _amplitudes.tryEmit(calcAmp(copy, read))
+                }
+            }
+        }
+    }
+
+    fun stop(): ByteArray {
+        recordJob?.cancel()
+        scope?.cancel()
+        scope = null
+        recordJob = null
+        runCatching { record?.stop() }
+        runCatching { record?.release() }
+        record = null
+        return captured.toByteArray()
+    }
+
+    private fun calcAmp(data: ShortArray, len: Int): Float {
+        var sum = 0L
+        for (i in 0 until len) sum += abs(data[i].toInt())
+        val avg = sum.toFloat() / len
+        return min(avg / 4_500f, 1f)
+    }
+
+    private fun shortsToBytesLE(data: ShortArray): ByteArray {
+        val buf = ByteBuffer.allocate(data.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+        for (s in data) buf.putShort(s)
+        return buf.array()
+    }
+}

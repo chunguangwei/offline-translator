@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Yiren</string>
+    <string name="app_tagline">Fully Offline · AI Powered</string>
+
+    <string name="nav_home">Home</string>
+    <string name="nav_translate">Translate</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_voice">Voice</string>
+    <string name="nav_vision">Vision</string>
+    <string name="nav_models">Models</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="home_greeting_morning">Good morning, start a smart day</string>
+    <string name="home_greeting_afternoon">Good afternoon, AI by your side</string>
+    <string name="home_greeting_evening">Good evening, take it easy</string>
+    <string name="home_current_model">Current model</string>
+    <string name="home_no_model">No active model</string>
+    <string name="home_go_download">Download now</string>
+    <string name="home_recent_chats">Recent chats</string>
+    <string name="home_no_recent">No conversations yet — start one!</string>
+    <string name="home_card_translate_title">Translate</string>
+    <string name="home_card_translate_desc">CN ↔ EN · Text / Voice / Photo</string>
+    <string name="home_card_chat_title">AI Chat</string>
+    <string name="home_card_chat_desc">Streaming · Thinking visible</string>
+    <string name="home_card_voice_title">Voice</string>
+    <string name="home_card_voice_desc">Live transcribe · Instant translate</string>
+    <string name="home_card_vision_title">Vision</string>
+    <string name="home_card_vision_desc">Ask the image · Multimodal</string>
+
+    <string name="translate_title">Translate</string>
+    <string name="translate_input_hint">Type to translate…</string>
+    <string name="translate_subtitle">Bilingual translation, streamed offline</string>
+    <string name="translate_output_placeholder">Translation appears here</string>
+    <string name="translate_swap">Swap</string>
+    <string name="translate_clear">Clear</string>
+    <string name="translate_paste">Paste</string>
+    <string name="translate_copy">Copy</string>
+    <string name="translate_speak">Speak</string>
+    <string name="translate_voice_input">Voice input</string>
+    <string name="translate_image_input">Photo translate</string>
+    <string name="translate_translating">Translating…</string>
+    <string name="translate_copied">Copied to clipboard</string>
+
+    <string name="lang_zh">Chinese</string>
+    <string name="lang_en">English</string>
+    <string name="lang_auto">Auto detect</string>
+
+    <string name="chat_title">AI Chat</string>
+    <string name="chat_input_hint">Talk to the AI…</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_stop">Stop</string>
+    <string name="chat_thinking">Thinking</string>
+    <string name="chat_show_thinking">Show reasoning</string>
+    <string name="chat_hide_thinking">Hide reasoning</string>
+    <string name="chat_new_session">New chat</string>
+    <string name="chat_history">History</string>
+    <string name="chat_regenerate">Regenerate</string>
+    <string name="chat_delete_msg">Delete</string>
+    <string name="chat_attach_image">Attach image</string>
+    <string name="chat_voice_start">Voice input</string>
+    <string name="chat_voice_stop">Done &amp; send</string>
+    <string name="chat_voice_listening">Listening…</string>
+    <string name="chat_voice_recording">Recording…</string>
+    <string name="chat_voice_transcribing">Transcribing audio…</string>
+    <string name="chat_voice_transcribing_phase1">Decoding speech…</string>
+    <string name="chat_voice_transcribing_phase2">Sending shortly…</string>
+
+    <string name="voice_title">Voice</string>
+    <string name="voice_tab_realtime">Quick translate</string>
+    <string name="voice_tab_meeting">Meeting transcribe</string>
+    <string name="voice_hold_to_talk">Hold to talk</string>
+    <string name="voice_release_to_send">Release to send</string>
+    <string name="voice_tap_to_record">Tap to record</string>
+    <string name="voice_tap_to_record_short">Tap mic to start</string>
+    <string name="voice_tap_to_stop">Tap to stop</string>
+    <string name="voice_subtitle">Real-time speech translation</string>
+    <string name="voice_label_source">Source</string>
+    <string name="voice_label_target">Translation</string>
+    <string name="voice_translating_hint">Translation will appear once recognized</string>
+    <string name="voice_recording">Recording…</string>
+    <string name="voice_processing">Recognizing…</string>
+    <string name="voice_audio_unsupported">Audio is not enabled for the current model. Please reload the model and try again.</string>
+    <string name="voice_go_download_model">Download model</string>
+    <string name="voice_model_missing_title">No voice model installed yet</string>
+    <string name="voice_model_missing_desc">Voice translation needs an offline model. Tap the button below to open the Models tab and download one.</string>
+
+    <string-array name="voice_processing_phases">
+        <item>Recognizing speech…</item>
+        <item>Parsing meaning…</item>
+        <item>Translating &amp; refining…</item>
+        <item>Almost done…</item>
+    </string-array>
+    <string name="voice_translating">Loading translation model and translating…</string>
+    <string name="voice_loading_model">Loading speech model, first launch may take a while…</string>
+    <string name="voice_ready_to_record">Model ready, tap to start recording</string>
+    <string name="voice_too_short">Too short, try again</string>
+    <string name="voice_no_permission">Microphone permission required</string>
+    <string name="voice_grant_permission">Grant</string>
+    <string name="voice_no_speech">No speech detected. Move closer to the mic, speak louder, and use clear pronunciation.</string>
+    <string name="voice_asr_failed">Recognition failed: %1$s</string>
+    <string name="voice_dir_zh_en">Chinese → English</string>
+    <string name="voice_dir_en_zh">English → Chinese</string>
+
+    <string name="vision_title">Vision</string>
+    <string name="vision_pick_image">Gallery</string>
+    <string name="vision_take_photo">Take photo</string>
+    <string name="vision_retake">Retake</string>
+    <string name="vision_replace">Replace</string>
+    <string name="vision_input_hint">Ask about this image…</string>
+    <string name="vision_quick_describe">Describe</string>
+    <string name="vision_quick_translate">Translate text</string>
+    <string name="vision_quick_what">What is this</string>
+    <string name="vision_quick_solve">Solve it</string>
+    <string name="vision_no_camera_permission">Camera permission required</string>
+    <string name="vision_analyzing">Analyzing image…</string>
+
+    <string name="models_title">Models</string>
+    <string name="models_tab_online">Online</string>
+    <string name="models_tab_local">Local</string>
+    <string name="models_tab_import">Import</string>
+    <string name="models_size">Size</string>
+    <string name="models_ram">RAM</string>
+    <string name="models_status_not_downloaded">Not downloaded</string>
+    <string name="models_status_downloading">Downloading</string>
+    <string name="models_status_paused">Paused</string>
+    <string name="models_status_ready">Ready</string>
+    <string name="models_status_active">Active</string>
+    <string name="models_action_download">Download</string>
+    <string name="models_action_pause">Pause</string>
+    <string name="models_action_resume">Resume</string>
+    <string name="models_action_activate">Activate</string>
+    <string name="models_action_delete">Delete</string>
+    <string name="models_import_pick">Pick local .task file</string>
+    <string name="models_import_help">Import a Gemma .task file from SD card or Downloads.</string>
+    <string name="models_low_ram_warning">Low device RAM — choose E2B</string>
+    <string name="models_delete_confirm">Delete the model file?</string>
+    <string name="models_dl_notification_channel">Model download</string>
+    <string name="models_dl_notification_title">Downloading model</string>
+    <string name="models_no_local">No local models yet</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_general">General</string>
+    <string name="settings_section_engine">Engine</string>
+    <string name="settings_section_storage">Storage</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_language">App language</string>
+    <string name="settings_language_system">Follow system</string>
+    <string name="settings_language_zh">简体中文</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">Follow system</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_default_model">Default model</string>
+    <string name="settings_model_source">Model source</string>
+    <string name="settings_model_source_hf">HuggingFace</string>
+    <string name="settings_model_source_mirror">HF China</string>
+    <string name="settings_model_source_custom">Custom</string>
+    <string name="settings_model_source_local">Local only</string>
+    <string name="settings_custom_mirror">Custom download URL</string>
+    <string name="settings_custom_mirror_hint">Enter a base URL — the model filename will be appended. e.g. https://your-mirror/models/. Leave empty to fall back to HF Mirror.</string>
+    <string name="settings_backend">Inference backend</string>
+    <string name="settings_backend_auto">Auto</string>
+    <string name="settings_backend_gpu">GPU</string>
+    <string name="settings_backend_cpu">CPU</string>
+    <string name="settings_backend_status_idle">Engine not loaded yet</string>
+    <string name="settings_backend_status_no_model">No model downloaded yet — go to the "Models" tab to download one</string>
+    <string name="settings_backend_status_loading">Loading engine…</string>
+    <string name="settings_backend_status_error">Engine load failed</string>
+    <string name="settings_backend_status_active">In use: %1$s</string>
+    <string name="settings_backend_status_fellback">Fell back to %1$s (device GPU not supported)</string>
+    <string name="settings_clear_cache">Clear cache</string>
+    <string name="settings_storage_path">Model storage path</string>
+    <string name="settings_about_version">Version</string>
+    <string name="settings_about_open_source">Open source</string>
+    <string name="settings_about_privacy">Privacy</string>
+    <string name="settings_privacy_content">All AI inference runs on your device. We never upload your text, images, or audio. Network is used only when you actively download a model.</string>
+
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_back">Back</string>
+    <string name="common_retry">Retry</string>
+    <string name="common_loading">Loading…</string>
+    <string name="common_empty">Nothing here</string>
+    <string name="common_error">Something went wrong</string>
+    <string name="common_no_active_model">Please download and activate a model first</string>
+    <string name="common_go_now">Go now</string>
+    <string name="common_size_mb">%1$.1f MB</string>
+    <string name="common_size_gb">%1$.2f GB</string>
+    <string name="common_progress">%1$d%%</string>
+</resources>

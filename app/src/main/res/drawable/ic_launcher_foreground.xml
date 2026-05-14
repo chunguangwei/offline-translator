@@ -1,0 +1,99 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!--
+        译人 (Yiren) launcher icon - microphone glyph (Siri-style refinement).
+
+        Designed to sit ON TOP of the iridescent orb background defined in
+        ic_launcher_background.xml. The glyph itself is white with subtle
+        inner shadow strokes to give it a "premium, glassy" look.
+
+        Composed inside the adaptive-icon safe zone (centered on 54,54).
+        Pieces:
+          1. Subtle dark inner halo (gives the white glyph a soft edge)
+          2. Mic capsule body (rounded pill)
+          3. Inner gradient line for capsule highlight
+          4. U-shaped stand cradle below the body
+          5. Vertical stand pole + base plate
+    -->
+
+    <!-- 1. Subtle dark "inner halo" so the glyph reads on bright gradient zones -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M54,26
+                          C46,26 40,32 40,40
+                          L40,60
+                          C40,71 49,80 60,80
+                          L60,86
+                          C60,87 60,87 60,87
+                          L48,87
+                          C46,87 44,89 44,91
+                          L44,93
+                          C44,94 45,95 46,95
+                          L62,95
+                          C63,95 64,94 64,93
+                          L64,91
+                          C64,89 62,87 60,87
+                          L60,80
+                          C71,80 80,71 80,60
+                          L80,58
+                          L74,58
+                          L74,60
+                          C74,67 67,74 60,74
+                          C53,74 47,68 47,60
+                          L47,58
+                          L40,58 Z" />
+
+    <!-- 2. Mic capsule body -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,28
+                          C47.5,28 42,33.5 42,40
+                          L42,60
+                          C42,66.5 47.5,72 54,72
+                          C60.5,72 66,66.5 66,60
+                          L66,40
+                          C66,33.5 60.5,28 54,28 Z" />
+
+    <!-- 3. Subtle highlight line on capsule (top-left gleam) -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M48,33
+                          C49,32 50,32 51,32
+                          L51,68
+                          C50,68 49,68 48,67 Z" />
+
+    <!-- 4. U-shaped stand cradle -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M36,58
+                          L36,60
+                          C36,70 44,78 54,78
+                          C64,78 72,70 72,60
+                          L72,58
+                          L68,58
+                          L68,60
+                          C68,68 62,74 54,74
+                          C46,74 40,68 40,60
+                          L40,58 Z" />
+
+    <!-- 5. Vertical stand pole -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M52,78 L56,78 L56,86 L52,86 Z" />
+
+    <!-- 6. Horizontal base plate -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M42,86
+                          L66,86
+                          C67.1,86 68,86.9 68,88
+                          L68,90
+                          C68,91.1 67.1,92 66,92
+                          L42,92
+                          C40.9,92 40,91.1 40,90
+                          L40,88
+                          C40,86.9 40.9,86 42,86 Z" />
+</vector>
