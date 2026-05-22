@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -27,12 +28,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.offlinetranslator.app.BuildConfig
 import com.offlinetranslator.app.R
 import com.offlinetranslator.app.core.data.InferenceBackend
 import com.offlinetranslator.app.core.data.ModelSource
 import com.offlinetranslator.app.core.designsystem.components.GlassCard
 import com.offlinetranslator.app.core.designsystem.theme.ThemeMode
 import com.offlinetranslator.app.core.i18n.AppLanguage
+import com.offlinetranslator.app.feature.update.UpdateDialogHost
+import com.offlinetranslator.app.feature.update.UpdateUiState
+import com.offlinetranslator.app.feature.update.UpdateViewModel
 
 @Composable
 fun SettingsScreen(
@@ -41,6 +46,10 @@ fun SettingsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val engineStatus by vm.engineStatus.collectAsStateWithLifecycle()
+
+    val updateVm: UpdateViewModel = hiltViewModel()
+    val updateState by updateVm.ui.collectAsStateWithLifecycle()
+    UpdateDialogHost(updateVm)
 
     Column(
         modifier = Modifier
@@ -168,6 +177,26 @@ fun SettingsScreen(
             // Show what the engine actually negotiated. Critical for the GPU
             // case because some Adreno/Mali drivers silently fall back to CPU.
             BackendStatusLine(engineStatus)
+        }
+
+        SettingSection(title = stringResource(R.string.settings_update)) {
+            Text(
+                text = stringResource(R.string.settings_current_version, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            val checking = updateState.phase == UpdateUiState.Phase.Checking
+            Button(
+                onClick = { updateVm.check(silent = false) },
+                enabled = !checking,
+            ) {
+                Text(
+                    stringResource(
+                        if (checking) R.string.update_checking else R.string.update_check,
+                    ),
+                )
+            }
         }
 
         Spacer(Modifier.height(24.dp))

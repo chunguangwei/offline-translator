@@ -35,6 +35,12 @@ android {
         resourceConfigurations += listOf("zh", "en")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // GitHub repo coordinates used by the in-app updater to query the
+        // Releases API and download the latest signed APK. Keep in sync with
+        // the repository this project is published to.
+        buildConfigField("String", "GITHUB_OWNER", "\"chunguangwei\"")
+        buildConfigField("String", "GITHUB_REPO", "\"offline-translator\"")
     }
 
     if (keystorePropertiesFile.exists()) {

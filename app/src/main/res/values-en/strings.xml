@@ -177,6 +177,19 @@
     <string name="settings_about_privacy">Privacy</string>
     <string name="settings_privacy_content">All AI inference runs on your device. We never upload your text, images, or audio. Network is used only when you actively download a model.</string>
 
+    <!-- App update (GitHub Releases) -->
+    <string name="settings_update">App update</string>
+    <string name="settings_current_version">Current version: %1$s</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">You\'re on the latest version</string>
+    <string name="update_available_title">New version %1$s available</string>
+    <string name="update_download">Download &amp; update</string>
+    <string name="update_downloading">Downloading %1$d%%</string>
+    <string name="update_install">Install now</string>
+    <string name="update_later">Later</string>
+    <string name="update_failed">Update failed: %1$s</string>
+
     <string name="common_ok">OK</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_back">Back</string>

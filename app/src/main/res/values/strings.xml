@@ -187,6 +187,19 @@
     <string name="settings_about_privacy">隐私声明</string>
     <string name="settings_privacy_content">本应用所有 AI 推理均在本地完成，不上传任何文本、图片、音频。仅在你主动下载模型时进行联网。</string>
 
+    <!-- App update (GitHub Releases) -->
+    <string name="settings_update">应用更新</string>
+    <string name="settings_current_version">当前版本：%1$s</string>
+    <string name="update_check">检查更新</string>
+    <string name="update_checking">检查中…</string>
+    <string name="update_up_to_date">已是最新版本</string>
+    <string name="update_available_title">发现新版本 %1$s</string>
+    <string name="update_download">下载并更新</string>
+    <string name="update_downloading">下载中 %1$d%%</string>
+    <string name="update_install">立即安装</string>
+    <string name="update_later">稍后</string>
+    <string name="update_failed">更新失败：%1$s</string>
+
     <!-- Common -->
     <string name="common_ok">确定</string>
     <string name="common_cancel">取消</string>

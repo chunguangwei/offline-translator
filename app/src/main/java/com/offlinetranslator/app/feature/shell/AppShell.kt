@@ -11,10 +11,12 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -26,6 +28,8 @@ import com.offlinetranslator.app.feature.chat.ChatScreen
 import com.offlinetranslator.app.feature.models.ModelsScreen
 import com.offlinetranslator.app.feature.settings.SettingsScreen
 import com.offlinetranslator.app.feature.translate.TranslateScreen
+import com.offlinetranslator.app.feature.update.UpdateDialogHost
+import com.offlinetranslator.app.feature.update.UpdateViewModel
 import com.offlinetranslator.app.feature.vision.VisionScreen
 import com.offlinetranslator.app.feature.voice.VoiceScreen
 
@@ -34,6 +38,12 @@ fun AppShell() {
     val nav = rememberNavController()
     val backStackEntry by nav.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    // Silent self-update check on cold start: prompts only when a newer release
+    // exists, otherwise stays completely quiet.
+    val updateVm: UpdateViewModel = hiltViewModel()
+    LaunchedEffect(Unit) { updateVm.check(silent = true) }
+    UpdateDialogHost(updateVm)
 
     AuroraBackground(modifier = Modifier.fillMaxSize()) {
         Scaffold(
