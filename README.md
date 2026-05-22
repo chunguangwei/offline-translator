@@ -2,7 +2,7 @@
 
 > 完全离线 / 端侧推理的 AI 助手 Android 应用 — 集合 **翻译 / AI 对话 / 语音转写 / 拍照看图 / 模型管理** 五大能力，零依赖 Google 服务（GMS-free），适配华为 / 荣耀等无 GMS 设备。
 
-**当前版本：1.0.3**　|　最低系统：Android 8.0（API 26）　|　支持 arm64-v8a / armeabi-v7a
+**当前版本：1.0.4**　|　最低系统：Android 8.0（API 26）　|　支持 arm64-v8a / armeabi-v7a
 
 ---
 
