@@ -56,8 +56,9 @@ google-services.json
 .DS_Store
 Thumbs.db
 
-# Models (large files)
+# Models (large files) — anchor to repo root so it doesn't swallow the
+# `feature/models/` source package.
 *.task
 *.bin
 *.tflite
-models/
+/models/
