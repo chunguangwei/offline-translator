@@ -1,0 +1,50 @@
+# 译人 iOS — xcodegen 工程声明。
+# 生成工程：`cd ios && xcodegen generate`（.xcodeproj 不入库，随手再生）。
+name: Yiren
+options:
+  bundleIdPrefix: com.offlinetranslator
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # 免费 Apple 账号：在 Xcode 的 Signing & Capabilities 里选 Personal Team 即可真机调试。
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # CLiteRTLM.xcframework 模拟器切片只有 arm64（无 x86_64），排除掉以免链接失败。
+    # Apple Silicon Mac 的模拟器本就跑 arm64，无损。
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
+
+targets:
+  Yiren:
+    type: application
+    platform: iOS
+    sources:
+      - path: Yiren
+      - path: LiteRTLM/swift
+        group: LiteRTLM
+    dependencies:
+      # 动态库：必须 embed + 签名，否则运行时 dyld 找不到。
+      - framework: LiteRTLM/CLiteRTLM.xcframework
+        embed: true
+        codeSign: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.offlinetranslator.yiren
+        INFOPLIST_KEY_CFBundleDisplayName: 译人
+    info:
+      path: Yiren/Info.plist
+      properties:
+        CFBundleDisplayName: 译人
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # 静态 LaunchScreen（App Store 要求）；品牌渐变启动视觉放 App 内（后续阶段）。
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
