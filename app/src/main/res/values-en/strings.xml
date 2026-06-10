@@ -198,6 +198,12 @@
     <string name="settings_about_privacy">Privacy</string>
     <string name="settings_privacy_content">All AI inference runs on your device. We never upload your text, images, or audio. Network is used only when you actively download a model.</string>
 
+    <!-- Splash -->
+    <string name="splash_subtitle">Offline AI translation &amp; Q&amp;A</string>
+    <string name="splash_tagline_1">Fully on-device · Your data never leaves</string>
+    <string name="splash_tagline_2">ZH ⇄ EN · Voice · Image Q&amp;A</string>
+    <string name="splash_tagline_3">Powered by Gemma, locally</string>
+
     <!-- About / License -->
     <string name="settings_about">About &amp; License</string>
     <string name="settings_about_app_line">Yiren · v%1$s</string>

@@ -208,6 +208,12 @@
     <string name="settings_about_privacy">隐私声明</string>
     <string name="settings_privacy_content">本应用所有 AI 推理均在本地完成，不上传任何文本、图片、音频。仅在你主动下载模型时进行联网。</string>
 
+    <!-- Splash -->
+    <string name="splash_subtitle">离线 AI 翻译与问答</string>
+    <string name="splash_tagline_1">纯离线推理 · 数据不出手机</string>
+    <string name="splash_tagline_2">中英互译 · 语音 · 图片问答</string>
+    <string name="splash_tagline_3">Gemma 多模态本地引擎</string>
+
     <!-- About / License -->
     <string name="settings_about">关于与许可</string>
     <string name="settings_about_app_line">译人 · v%1$s</string>
