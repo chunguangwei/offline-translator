@@ -213,6 +213,7 @@
     <string name="splash_tagline_1">纯离线推理 · 数据不出手机</string>
     <string name="splash_tagline_2">中英互译 · 语音 · 图片问答</string>
     <string name="splash_tagline_3">Gemma 多模态本地引擎</string>
+    <string name="splash_skip">跳过 %1$ds</string>
 
     <!-- About / License -->
     <string name="settings_about">关于与许可</string>

@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -68,12 +72,13 @@ private val BrandSplashGradient = listOf(
     Color(0xFFC2479B),
 )
 
-private const val SPLASH_DURATION_MS = 2400L
+private const val SPLASH_DURATION_SEC = 6
 
 /**
  * 启动页：暖色渐变 + 眨眼 logo 角色 + 轮换功能标语 + 版本号。
  * 若远程配置了启动图（[SplashViewModel.remoteImage] 非空）则整屏显示远程图。
- * 展示 [SPLASH_DURATION_MS] 后回调 [onFinished]，由调用方做切换动画。
+ * 展示 [SPLASH_DURATION_SEC] 秒（右上角可随时跳过）后回调 [onFinished]，
+ * 由调用方做切换动画。
  */
 @Composable
 fun SplashScreen(
@@ -82,8 +87,12 @@ fun SplashScreen(
 ) {
     val remoteImage by vm.remoteImage.collectAsStateWithLifecycle()
 
+    var remainingSec by remember { mutableIntStateOf(SPLASH_DURATION_SEC) }
     LaunchedEffect(Unit) {
-        delay(SPLASH_DURATION_MS)
+        while (remainingSec > 0) {
+            delay(1000)
+            remainingSec--
+        }
         onFinished()
     }
 
@@ -135,6 +144,20 @@ fun SplashScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 40.dp),
+        )
+        // 右上角「跳过」：半透明胶囊 + 剩余秒数，随时可点。
+        Text(
+            text = stringResource(R.string.splash_skip, remainingSec),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 12.dp, end = 16.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color.Black.copy(alpha = 0.22f))
+                .clickable(onClick = onFinished)
+                .padding(horizontal = 14.dp, vertical = 7.dp),
         )
     }
 }
@@ -195,7 +218,7 @@ private fun RotatingTaglines(modifier: Modifier = Modifier) {
     var idx by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            delay(1100)
+            delay(1500)
             idx = (idx + 1) % tags.size
         }
     }

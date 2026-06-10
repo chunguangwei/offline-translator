@@ -203,6 +203,7 @@
     <string name="splash_tagline_1">Fully on-device · Your data never leaves</string>
     <string name="splash_tagline_2">ZH ⇄ EN · Voice · Image Q&amp;A</string>
     <string name="splash_tagline_3">Powered by Gemma, locally</string>
+    <string name="splash_skip">Skip %1$ds</string>
 
     <!-- About / License -->
     <string name="settings_about">About &amp; License</string>
