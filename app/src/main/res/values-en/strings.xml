@@ -40,14 +40,33 @@
     <string name="translate_voice_input">Voice input</string>
     <string name="translate_image_input">Photo translate</string>
     <string name="translate_translating">Translating…</string>
+    <string name="translate_loading_model">Loading model, please wait…</string>
+    <string name="translate_voice">Voice input</string>
+    <string name="translate_recording">Recording… tap again to stop</string>
+    <string name="translate_transcribing">Transcribing…</string>
+    <string name="translate_need_model">Download the offline model first to translate</string>
+    <string name="translate_go_download">Download</string>
+    <string name="nav_history">History</string>
+    <string name="nav_qa">Q&amp;A</string>
+    <string name="placeholder_coming_soon">Coming soon</string>
+    <string name="history_title">History</string>
+    <string name="history_empty">No translation history yet</string>
+    <string name="history_clear">Clear</string>
+    <string name="history_copy">Copy translation</string>
+    <string name="history_delete">Delete</string>
     <string name="translate_copied">Copied to clipboard</string>
 
     <string name="lang_zh">Chinese</string>
     <string name="lang_en">English</string>
     <string name="lang_auto">Auto detect</string>
 
-    <string name="chat_title">AI Chat</string>
-    <string name="chat_input_hint">Talk to the AI…</string>
+    <string name="chat_title">Q&amp;A</string>
+    <string name="chat_input_hint">Ask anything, or attach an image…</string>
+    <string name="chat_image_remove">Remove image</string>
+    <string name="chat_sessions">Sessions</string>
+    <string name="chat_sessions_empty">No sessions yet</string>
+    <string name="chat_session_untitled">New chat</string>
+    <string name="chat_session_delete">Delete session</string>
     <string name="chat_send">Send</string>
     <string name="chat_stop">Stop</string>
     <string name="chat_thinking">Thinking</string>
@@ -153,6 +172,8 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_default_model">Default model</string>
+    <string name="settings_model_manage">Models</string>
+    <string name="settings_model_manage_action">Download / manage models</string>
     <string name="settings_model_source">Model source</string>
     <string name="settings_model_source_hf">HuggingFace</string>
     <string name="settings_model_source_mirror">HF China</string>
@@ -176,6 +197,15 @@
     <string name="settings_about_open_source">Open source</string>
     <string name="settings_about_privacy">Privacy</string>
     <string name="settings_privacy_content">All AI inference runs on your device. We never upload your text, images, or audio. Network is used only when you actively download a model.</string>
+
+    <!-- About / License -->
+    <string name="settings_about">About &amp; License</string>
+    <string name="settings_about_app_line">Yiren · v%1$s</string>
+    <string name="settings_about_copyright">Copyright © 2026 weichunguang. All Rights Reserved.</string>
+    <string name="settings_about_license">Proprietary license: free for personal study, research, and evaluation, including modification. Any commercial use requires prior written permission from the copyright holder.</string>
+    <string name="settings_about_repo">GitHub repository</string>
+    <string name="settings_about_repo_url">https://github.com/chunguangwei/offline-translator</string>
+    <string name="settings_about_credits">Third-party components: Google LiteRT-LM SDK and Gemma models (under their respective original licenses).</string>
 
     <!-- App update (GitHub Releases) -->
     <string name="settings_update">App update</string>

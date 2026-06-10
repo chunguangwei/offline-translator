@@ -1,0 +1,49 @@
+译人 (Yiren) 软件许可协议 / Yiren Software License
+
+版权所有 (c) 2026 weichunguang <chunguangwei@gmail.com>
+Copyright (c) 2026 weichunguang. All Rights Reserved. 保留所有权利。
+
+================================================================
+中文条款（以中文版本为准）
+================================================================
+
+一、范围
+   "本软件"指本代码仓库包含的全部内容，包括但不限于源代码、设计稿、
+   图标、文档及其衍生作品。
+
+二、授权（非商业）
+   在遵守本协议的前提下，任何人可以出于个人学习、研究、评估目的查看、
+   下载、运行本软件，并可在保留本协议与版权声明的前提下出于非商业目的
+   修改与分享。
+
+三、商业使用限制
+   任何商业用途均须事先获得著作权人 weichunguang 的书面同意，包括但
+   不限于：将本软件或其衍生作品用于盈利性产品或服务；付费分发、再许可、
+   转售或捆绑销售；在商业组织内部署用于经营活动。
+   商业授权请联系：chunguangwei@gmail.com
+
+四、第三方组件
+   本软件依赖的第三方库与模型（如 LiteRT-LM、Gemma 等）受其各自许可
+   协议约束，本协议不改变亦不覆盖该等第三方协议。
+
+五、免责声明
+   本软件按“现状”提供，不附带任何明示或默示担保。作者不对因使用或无法
+   使用本软件产生的任何损失承担责任。
+
+六、违约
+   未经授权的商业使用构成对著作权的侵犯，著作权人保留依法追究责任的权利。
+
+================================================================
+English Summary (the Chinese version prevails in case of conflict)
+================================================================
+
+This software (all source code, designs, icons, and documentation in this
+repository) is the property of weichunguang. You MAY view, run, study, and
+modify it for personal, non-commercial purposes, provided this license and
+copyright notice are retained. ANY commercial use — including use in a
+for-profit product or service, paid distribution, sublicensing, resale, or
+deployment within a commercial organization — REQUIRES the prior written
+consent of the author. Contact: chunguangwei@gmail.com
+
+Third-party components (e.g. LiteRT-LM, Gemma) remain under their own
+licenses. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.

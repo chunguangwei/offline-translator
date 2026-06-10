@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  译人 Yiren — App 图标 master 资产 (1024×1024)
+  造型: C3-b「译人合一」头=对话气泡 + 肩身 + 双语镂空点
+  配色: 暖色渐变 #FFB152 → #FF6F61 → #C2479B
+  说明: 本 master 用 <mask> 实现双语点镂空，适用于浏览器/iOS/营销高清输出。
+        Android VectorDrawable 不支持 mask，对应资源见 app/.../res/drawable/ic_launcher_foreground.xml（evenodd 复合路径）。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFB152"/>
+      <stop offset=".5" stop-color="#FF6F61"/>
+      <stop offset="1" stop-color="#C2479B"/>
+    </linearGradient>
+    <radialGradient id="gloss" cx="30%" cy="18%" r="85%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".42"/>
+      <stop offset=".6" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="dots">
+      <rect x="0" y="0" width="1024" height="1024" fill="#fff"/>
+      <circle cx="476" cy="392" r="26" fill="#000"/>
+      <circle cx="548" cy="392" r="26" fill="#000"/>
+    </mask>
+  </defs>
+
+  <!-- squircle 背景 -->
+  <rect x="0" y="0" width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="230" fill="url(#gloss)"/>
+
+  <!-- 前景：白色「气泡头 + 肩身」，双语点 mask 镂空 -->
+  <g fill="#ffffff" mask="url(#dots)">
+    <!-- 头 = 对话气泡 + 左下尾巴 -->
+    <path d="M512 230
+             a150 150 0 1 1 -104 257
+             l-80 46 l30 -82
+             a150 150 0 0 1 154 -221 z"/>
+    <!-- 肩身 -->
+    <path d="M300 858
+             C300 622 392 520 512 520
+             C632 520 724 622 724 858 Z"/>
+  </g>
+</svg>

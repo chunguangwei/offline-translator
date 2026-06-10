@@ -44,6 +44,20 @@
     <string name="translate_voice_input">语音输入</string>
     <string name="translate_image_input">拍照翻译</string>
     <string name="translate_translating">正在翻译…</string>
+    <string name="translate_loading_model">正在加载模型，请稍等…</string>
+    <string name="translate_voice">语音输入</string>
+    <string name="translate_recording">正在录音，再次点击结束</string>
+    <string name="translate_transcribing">正在识别语音…</string>
+    <string name="translate_need_model">需要先下载离线模型才能翻译</string>
+    <string name="translate_go_download">去下载</string>
+    <string name="nav_history">历史</string>
+    <string name="nav_qa">问答</string>
+    <string name="placeholder_coming_soon">功能开发中，敬请期待</string>
+    <string name="history_title">历史</string>
+    <string name="history_empty">暂无翻译记录</string>
+    <string name="history_clear">清空</string>
+    <string name="history_copy">复制译文</string>
+    <string name="history_delete">删除</string>
     <string name="translate_copied">已复制到剪贴板</string>
 
     <!-- Languages -->
@@ -52,8 +66,13 @@
     <string name="lang_auto">自动检测</string>
 
     <!-- Chat -->
-    <string name="chat_title">AI 对话</string>
-    <string name="chat_input_hint">和 AI 聊点什么…</string>
+    <string name="chat_title">问答</string>
+    <string name="chat_input_hint">问点什么，或上传图片…</string>
+    <string name="chat_image_remove">移除图片</string>
+    <string name="chat_sessions">会话</string>
+    <string name="chat_sessions_empty">暂无会话</string>
+    <string name="chat_session_untitled">新会话</string>
+    <string name="chat_session_delete">删除会话</string>
     <string name="chat_send">发送</string>
     <string name="chat_stop">停止生成</string>
     <string name="chat_thinking">思考中</string>
@@ -163,6 +182,8 @@
     <string name="settings_theme_light">浅色</string>
     <string name="settings_theme_dark">深色</string>
     <string name="settings_default_model">默认模型</string>
+    <string name="settings_model_manage">模型管理</string>
+    <string name="settings_model_manage_action">下载 / 管理模型</string>
     <string name="settings_model_source">模型源</string>
     <string name="settings_model_source_hf">HuggingFace 直连</string>
     <string name="settings_model_source_mirror">HF 中国源</string>
@@ -186,6 +207,15 @@
     <string name="settings_about_open_source">开源协议</string>
     <string name="settings_about_privacy">隐私声明</string>
     <string name="settings_privacy_content">本应用所有 AI 推理均在本地完成，不上传任何文本、图片、音频。仅在你主动下载模型时进行联网。</string>
+
+    <!-- About / License -->
+    <string name="settings_about">关于与许可</string>
+    <string name="settings_about_app_line">译人 · v%1$s</string>
+    <string name="settings_about_copyright">版权所有 © 2026 weichunguang，保留所有权利。</string>
+    <string name="settings_about_license">本软件采用专有许可：可出于个人学习、研究、评估目的使用与修改；任何商业用途须事先获得著作权人书面授权。</string>
+    <string name="settings_about_repo">GitHub 仓库</string>
+    <string name="settings_about_repo_url">https://github.com/chunguangwei/offline-translator</string>
+    <string name="settings_about_credits">第三方组件：Google LiteRT-LM SDK 与 Gemma 模型（遵循各自原始许可）。</string>
 
     <!-- App update (GitHub Releases) -->
     <string name="settings_update">应用更新</string>

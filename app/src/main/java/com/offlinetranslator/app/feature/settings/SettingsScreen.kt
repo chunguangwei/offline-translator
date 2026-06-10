@@ -1,5 +1,6 @@
 package com.offlinetranslator.app.feature.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,6 +44,7 @@ import com.offlinetranslator.app.feature.update.UpdateViewModel
 @Composable
 fun SettingsScreen(
     padding: PaddingValues,
+    onOpenModels: () -> Unit = {},
     vm: SettingsViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -102,6 +105,12 @@ fun SettingsScreen(
                     onClick = { vm.setLanguage(AppLanguage.EN) },
                     label = { Text(stringResource(R.string.lang_en)) },
                 )
+            }
+        }
+
+        SettingSection(title = stringResource(R.string.settings_model_manage)) {
+            Button(onClick = onOpenModels, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.settings_model_manage_action))
             }
         }
 
@@ -199,12 +208,48 @@ fun SettingsScreen(
             }
         }
 
+        SettingSection(title = stringResource(R.string.settings_about)) {
+            val uriHandler = LocalUriHandler.current
+            val repoUrl = stringResource(R.string.settings_about_repo_url)
+            Text(
+                text = stringResource(R.string.settings_about_app_line, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_about_copyright),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_about_license),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_about_repo),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { uriHandler.openUri(repoUrl) },
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_about_credits),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.settings_privacy_content),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         Spacer(Modifier.height(24.dp))
-        Text(
-            text = stringResource(R.string.settings_privacy_content),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

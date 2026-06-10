@@ -49,7 +49,9 @@ class PcmAudioRecorder @Inject constructor() {
     @SuppressLint("MissingPermission")
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun start() {
-        if (record != null) return
+        // 单例被翻译/问答两页共用：上一个录音还没停（如录着音切页）就先停掉丢弃，
+        // 保证本次 start 拿到干净的新录音，而非未定义行为。
+        if (record != null) stop()
         captured.reset()
         val minBuf = AudioRecord.getMinBufferSize(sampleRate, channelConfig, encoding)
         val bufSize = (minBuf * 2).coerceAtLeast(sampleRate / 5) // ~200 ms buffer

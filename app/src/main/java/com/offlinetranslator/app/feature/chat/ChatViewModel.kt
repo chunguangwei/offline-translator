@@ -1,11 +1,18 @@
 package com.offlinetranslator.app.feature.chat
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.offlinetranslator.app.core.data.db.ChatDao
 import com.offlinetranslator.app.core.data.db.ChatMessageEntity
 import com.offlinetranslator.app.core.data.db.ChatSessionEntity
 import com.offlinetranslator.app.engine.audio.PcmAudioRecorder
+import com.offlinetranslator.app.engine.audio.pcmToWav
 import com.offlinetranslator.app.engine.llm.GemmaEngine
 import com.offlinetranslator.app.engine.llm.PromptTemplates
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,15 +43,31 @@ data class ChatUi(
     val voiceLang: ChatVoiceLang = ChatVoiceLang.ZH,
     val voicePartial: String = "",
     val amplitudes: List<Float> = emptyList(),
+    /** 待发送的图片附件（单轮视觉问答用，不持久化）。 */
+    val attachedBitmap: Bitmap? = null,
     val error: String? = null,
 )
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val engine: GemmaEngine,
     private val dao: ChatDao,
     private val recorder: PcmAudioRecorder,
 ) : ViewModel() {
+
+    private companion object {
+        /** 未压缩消息超过这个条数 → 触发上下文压缩。 */
+        const val COMPRESS_AFTER_MESSAGES = 20
+        /**
+         * 未压缩消息总字数预算。超过即视为会话"满了"→ 触发压缩；同时也是单轮
+         * prompt 携带原文的硬上限（压缩没跟上时从最旧的开始裁）。模型窗口
+         * 4096 token，预留生成空间后中文按 ≈1 字/token 取 3000。
+         */
+        const val CONTEXT_CHAR_BUDGET = 3000
+        /** 压缩后保留的最近原文条数（其余并入摘要）。 */
+        const val KEEP_RAW_AFTER_COMPRESS = 6
+    }
 
     private val _ui = MutableStateFlow(ChatUi())
     val ui = _ui.asStateFlow()
@@ -57,9 +80,36 @@ class ChatViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<ChatMessageEntity>())
 
+    /** 全部会话列表（倒序），供会话抽屉展示/切换/删除。 */
+    val sessions = dao.observeSessions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<ChatSessionEntity>())
+
     private var generateJob: Job? = null
     private var voiceJob: Job? = null
     private var ampJob: Job? = null
+
+    fun openSession(id: String) {
+        if (_ui.value.isGenerating) return
+        _sid.value = id
+        _ui.update { it.copy(sessionId = id, streamingContent = "", error = null, attachedBitmap = null) }
+    }
+
+    fun deleteSession(id: String) {
+        viewModelScope.launch {
+            // 先删该会话消息引用的本地图片文件，避免孤儿 JPEG 累积占空间。
+            withContext(Dispatchers.IO) {
+                dao.messagesOnce(id).mapNotNull { it.imageUri }.forEach { path ->
+                    runCatching { java.io.File(path).delete() }
+                }
+            }
+            dao.deleteMessages(id)
+            dao.deleteSession(id)
+            if (_sid.value == id) {
+                _sid.value = null
+                _ui.update { it.copy(sessionId = null, streamingContent = "") }
+            }
+        }
+    }
 
     fun setVoiceLang(lang: ChatVoiceLang) { _ui.update { it.copy(voiceLang = lang) } }
 
@@ -179,30 +229,32 @@ class ChatViewModel @Inject constructor(
         return text
     }
 
-    private fun pcmToWav(pcm: ByteArray): ByteArray {
-        val sampleRate = 16_000
-        val channels = 1
-        val bps = 16
-        val byteRate = sampleRate * channels * bps / 8
-        val blockAlign = channels * bps / 8
-        val totalDataLen = pcm.size + 36
-        val out = java.io.ByteArrayOutputStream(44 + pcm.size)
-        fun w16(v: Int) { out.write(v and 0xff); out.write((v shr 8) and 0xff) }
-        fun w32(v: Int) {
-            out.write(v and 0xff); out.write((v shr 8) and 0xff)
-            out.write((v shr 16) and 0xff); out.write((v shr 24) and 0xff)
+    fun attachImage(uri: Uri?) {
+        if (uri == null) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val bmp = com.offlinetranslator.app.engine.image.decodeBitmapForGemma(context, uri)
+            if (bmp == null) _ui.update { it.copy(error = "图片解码失败，请换一张") }
+            else _ui.update { it.copy(attachedBitmap = bmp, error = null) }
         }
-        out.write("RIFF".toByteArray()); w32(totalDataLen)
-        out.write("WAVE".toByteArray())
-        out.write("fmt ".toByteArray()); w32(16); w16(1); w16(channels)
-        w32(sampleRate); w32(byteRate); w16(blockAlign); w16(bps)
-        out.write("data".toByteArray()); w32(pcm.size); out.write(pcm)
-        return out.toByteArray()
     }
+
+    fun clearImage() { _ui.update { it.copy(attachedBitmap = null) } }
+
+    /** 把附图保存到 app 私有目录，返回绝对路径（用于持久化到消息并在气泡渲染）。失败返回 null。 */
+    private fun saveImageToFile(bmp: Bitmap): String? = runCatching {
+        val dir = java.io.File(context.filesDir, "chat_images").apply { mkdirs() }
+        val f = java.io.File(dir, "${UUID.randomUUID()}.jpg")
+        java.io.FileOutputStream(f).use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        f.absolutePath
+    }.getOrNull()
 
     fun send(text: String) {
         val content = text.trim()
-        if (content.isEmpty() || _ui.value.isGenerating) return
+        val image = _ui.value.attachedBitmap
+        if ((content.isEmpty() && image == null) || _ui.value.isGenerating) return
+        // 附件已捕获到局部变量，发送即清掉输入区预览（图片随消息进气泡展示），
+        // 不等模型处理完 —— 与主流 IM/助手类应用一致。
+        if (image != null) _ui.update { it.copy(attachedBitmap = null) }
         ensureSession()
         val sid = _sid.value
         if (sid == null) {
@@ -211,15 +263,33 @@ class ChatViewModel @Inject constructor(
         }
         generateJob?.cancel()
         generateJob = viewModelScope.launch {
-            // Snapshot history BEFORE inserting the new user message — the Room
-            // flow won't have observed the insert yet, and we explicitly add the
-            // user turn into the prompt below. This prevents the off-by-one
-            // history bug (first reply previously had 0 history turns).
-            val historyBefore = messages.value.map { it.role to it.content }
+            // 上下文 = （若有）旧消息压缩摘要 + 摘要之后的全部消息原文——用户与 AI
+            // 双方都带上，模型才能延续自己说过的话。从 DB 直读快照（而非 UI Flow），
+            // 切换会话后立即提问也不会拿到旧列表；此时新用户轮尚未入库，prompt 末尾
+            // 会显式追加它，不会重复。仅当总字数超预算（压缩还没跟上）才裁掉最旧的兜底。
+            val session = dao.getSession(sid)
+            val unsummarized = dao.messagesOnce(sid).drop(session?.summarizedCount ?: 0)
+            val summaryTurns = session?.summary?.takeIf { it.isNotBlank() }?.let {
+                listOf("user" to "（此前对话的摘要）$it", "assistant" to "好的，我已了解上文。")
+            } ?: emptyList()
+            // 带图轮次在历史里显式标注，模型才知道哪轮发过图、图和哪句话对应。
+            val rawTurns = unsummarized.map { m ->
+                m.role to when {
+                    m.imageUri != null && m.content.isBlank() -> "（发送了一张图片）"
+                    m.imageUri != null -> "（发送了一张图片）${m.content}"
+                    else -> m.content
+                }
+            }
+            val historyBefore = summaryTurns + fitContextBudget(rawTurns)
+            // 文件写入/JPEG 压缩是阻塞 IO，挪到 IO 线程，别卡主线程。
+            val imagePath = if (image != null) withContext(Dispatchers.IO) { saveImageToFile(image) } else null
+            // 有图就让图片承担展示，文字可为空；图存失败才退回文字占位。
+            val userTurnContent = if (content.isEmpty() && image != null && imagePath == null) "🖼 [图片]" else content
             dao.insertMessage(
                 ChatMessageEntity(
                     sessionId = sid, role = "user",
-                    content = content, createdAt = System.currentTimeMillis(),
+                    content = userTurnContent, imageUri = imagePath,
+                    createdAt = System.currentTimeMillis(),
                 )
             )
             engine.ensureLoaded().onFailure { e ->
@@ -229,12 +299,34 @@ class ChatViewModel @Inject constructor(
                 _ui.update { it.copy(error = msg) }
                 return@launch
             }
+            // 图片识别预检：模型不支持图像就给清晰提示，别让用户白等。
+            if (image != null && engine.status.value.activeModel?.supportsImage == false) {
+                _ui.update { it.copy(error = "当前模型不支持图像识别，请在「设置」切换支持图像的模型", attachedBitmap = null) }
+                return@launch
+            }
+            // 本轮没新附图时，回看上下文窗口内最近一张已发图片并重新喂给模型——
+            // 否则"图里第二个字是什么"这类追问模型根本看不到图。图片消息被压缩
+            // 进摘要后自然退出窗口、停止重喂（控制每轮视觉前缀的耗时代价）。
+            val refedImage = if (image == null && engine.status.value.activeModel?.supportsImage != false) {
+                unsummarized.lastOrNull { it.imageUri != null }?.imageUri?.let { path ->
+                    withContext(Dispatchers.IO) {
+                        runCatching { android.graphics.BitmapFactory.decodeFile(path) }.getOrNull()
+                    }
+                }
+            } else null
+            val sendImage = image ?: refedImage
             _ui.update { it.copy(isGenerating = true, streamingContent = "", error = null) }
 
-            val prompt = PromptTemplates.chat(historyBefore, content)
+            val prompt = when {
+                image != null -> PromptTemplates.chatWithImage(historyBefore, content)
+                refedImage != null -> PromptTemplates.chatWithImage(historyBefore, content, refed = true)
+                else -> PromptTemplates.chat(historyBefore, content)
+            }
             val sb = StringBuilder()
             try {
-                engine.generateStream(prompt).collect { token ->
+                val stream = if (sendImage != null) engine.generateStream(prompt, includeImage = sendImage)
+                             else engine.generateStream(prompt)
+                stream.collect { token ->
                     sb.append(token)
                     _ui.update { it.copy(streamingContent = sb.toString()) }
                 }
@@ -244,20 +336,87 @@ class ChatViewModel @Inject constructor(
                         content = sb.toString(), createdAt = System.currentTimeMillis(),
                     )
                 )
-                dao.upsertSession(
-                    ChatSessionEntity(
-                        id = sid,
-                        title = content.take(20),
-                        updatedAt = System.currentTimeMillis(),
-                        modelId = engine.status.value.activeModel?.id ?: "",
-                    )
+                // 用 UPDATE 而非 REPLACE，避免把会话的压缩摘要字段抹掉。
+                dao.updateSessionMeta(
+                    id = sid,
+                    title = userTurnContent.take(20),
+                    updatedAt = System.currentTimeMillis(),
+                    modelId = engine.status.value.activeModel?.id ?: "",
                 )
-                _ui.update { it.copy(isGenerating = false, streamingContent = "") }
+                _ui.update { it.copy(isGenerating = false, streamingContent = "", attachedBitmap = null) }
+                maybeCompressContext(sid)
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                // 用户点了暂停 —— 不是错误。已生成的部分由 stop() 落库。
+                throw ce
             } catch (t: Throwable) {
                 _ui.update { it.copy(isGenerating = false, streamingContent = "", error = t.message) }
             }
         }
     }
 
-    fun stop() { generateJob?.cancel(); _ui.update { it.copy(isGenerating = false) } }
+    /**
+     * 上下文裁剪兜底：正常情况下双方消息全量进上下文；只有当压缩还没跟上、
+     * 总字数已超预算时，才从最旧的开始裁（最近的消息永远保留）。
+     */
+    private fun fitContextBudget(turns: List<Pair<String, String>>): List<Pair<String, String>> {
+        var total = turns.sumOf { it.second.length }
+        var result = turns
+        while (result.size > 1 && total > CONTEXT_CHAR_BUDGET) {
+            total -= result.first().second.length
+            result = result.drop(1)
+        }
+        return result
+    }
+
+    /**
+     * 上下文压缩：未压缩消息超过 [COMPRESS_AFTER_MESSAGES] 条、或总字数超出
+     * [CONTEXT_CHAR_BUDGET]（会话"满了"）时，把较早的部分（保留最近
+     * [KEEP_RAW_AFTER_COMPRESS] 条原文）连同旧摘要一起压成 ≤200 字新摘要存到
+     * 会话上。回答完成后后台静默执行，失败不影响对话（下轮再试）。
+     */
+    private fun maybeCompressContext(sid: String) {
+        viewModelScope.launch {
+            runCatching {
+                val session = dao.getSession(sid) ?: return@launch
+                val all = dao.messagesOnce(sid)
+                val unsummarized = all.drop(session.summarizedCount)
+                val totalChars = unsummarized.sumOf { it.content.length }
+                if (unsummarized.size <= COMPRESS_AFTER_MESSAGES &&
+                    totalChars <= CONTEXT_CHAR_BUDGET
+                ) return@launch
+                val toCompress = unsummarized.dropLast(KEEP_RAW_AFTER_COMPRESS)
+                if (toCompress.isEmpty()) return@launch
+                val convText = toCompress.joinToString("\n") {
+                    (if (it.role == "user") "用户：" else "助手：") + it.content
+                }
+                val prompt = PromptTemplates.summarize(convText, session.summary)
+                val sb = StringBuilder()
+                engine.generateStream(prompt).collect { sb.append(it) }
+                val newSummary = PromptTemplates.trimAtStop(sb.toString()).trim()
+                if (newSummary.isNotEmpty()) {
+                    dao.updateSummary(sid, newSummary, session.summarizedCount + toCompress.size)
+                }
+            }
+        }
+    }
+
+    fun stop() {
+        generateJob?.cancel()
+        // 暂停：把已经流式出来的部分作为助手回复存下来，别丢。
+        val partial = _ui.value.streamingContent
+        val sid = _sid.value
+        if (partial.isNotBlank() && sid != null) {
+            viewModelScope.launch {
+                dao.insertMessage(
+                    ChatMessageEntity(
+                        sessionId = sid, role = "assistant",
+                        content = partial, createdAt = System.currentTimeMillis(),
+                    )
+                )
+                // 暂停也算一次活跃，把会话顶到列表最前（与正常完成一致）。
+                dao.touchSession(sid, System.currentTimeMillis())
+            }
+        }
+        _ui.update { it.copy(isGenerating = false, streamingContent = "", attachedBitmap = null) }
+    }
 }

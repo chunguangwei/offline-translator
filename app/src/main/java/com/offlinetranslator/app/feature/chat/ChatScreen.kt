@@ -1,16 +1,20 @@
 package com.offlinetranslator.app.feature.chat
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,38 +27,54 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.offlinetranslator.app.R
 import com.offlinetranslator.app.core.data.db.ChatMessageEntity
+import androidx.compose.ui.text.font.FontWeight
 import com.offlinetranslator.app.core.designsystem.components.GlassCard
 import com.offlinetranslator.app.core.designsystem.components.ThinkingDots
 import com.offlinetranslator.app.core.designsystem.components.WaveformBars
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     padding: PaddingValues,
@@ -63,7 +83,9 @@ fun ChatScreen(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val messages by vm.messages.collectAsStateWithLifecycle()
+    val sessions by vm.sessions.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
+    var showSessions by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     // Mic permission
@@ -81,20 +103,31 @@ fun ChatScreen(
         hasMic = granted
         if (granted) vm.startVoiceInput()
     }
+    val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri -> vm.attachImage(uri) }
 
-    LaunchedEffect(messages.size, ui.streamingContent) {
-        if (messages.isNotEmpty() || ui.streamingContent.isNotEmpty()) {
-            listState.animateScrollToItem(
-                index = (messages.size - 1).coerceAtLeast(0) +
-                    if (ui.streamingContent.isNotEmpty()) 1 else 0
-            )
+    // 自动「贴底」滚动：流式回复时新 token 在气泡底部，必须滚到列表绝对底部，
+    // 否则长回复越往后生成的内容会落到输入框后面看不到（仅对齐气泡顶部时的老问题）。
+    // 用一个超过任何气泡高度的大 offset，列表会被钳到内容末尾 = 滚到最底，
+    // 最新一行始终停在输入框上方。streaming 项的存在条件要和下方列表保持一致
+    // （isGenerating 也算，覆盖"思考中"无文本的瞬间），否则会差一格。
+    LaunchedEffect(messages.size, ui.streamingContent, ui.isGenerating) {
+        val hasStreaming = ui.streamingContent.isNotEmpty() || ui.isGenerating
+        val count = messages.size + if (hasStreaming) 1 else 0
+        if (count > 0) {
+            listState.scrollToItem(count - 1, scrollOffset = 1_000_000)
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(padding),
+            .padding(padding)
+            // 标准 IME 链：先消费 Scaffold 已经发的系统栏 insets，再补键盘高度，
+            // 键盘弹起时输入条上浮、列表收缩，内容不会被顶进状态栏。
+            .consumeWindowInsets(padding)
+            .imePadding(),
     ) {
         // Top bar
         Row(
@@ -109,8 +142,13 @@ fun ChatScreen(
                 text = stringResource(R.string.chat_title),
                 style = MaterialTheme.typography.headlineSmall,
             )
-            IconButton(onClick = vm::startNewSession) {
-                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.chat_new_session))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { showSessions = true }) {
+                    Icon(Icons.Rounded.History, contentDescription = stringResource(R.string.chat_sessions))
+                }
+                IconButton(onClick = vm::startNewSession) {
+                    Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.chat_new_session))
+                }
             }
         }
 
@@ -121,6 +159,8 @@ fun ChatScreen(
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
+            // 底部留缓冲：最后一条消息与输入框之间有间距，不会贴死/被压住。
+            contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(messages, key = { it.id }) { msg ->
@@ -217,6 +257,25 @@ fun ChatScreen(
             }
         }
 
+        // Attached image preview (cleared after send).
+        ui.attachedBitmap?.let { bmp ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+                )
+                Spacer(Modifier.width(8.dp))
+                IconButton(onClick = vm::clearImage) {
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.chat_image_remove))
+                }
+            }
+        }
+
         // Input bar
         GlassCard(
             modifier = Modifier
@@ -228,6 +287,21 @@ fun ChatScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
+                if (!ui.isRecording && !ui.isGenerating && !ui.isTranscribing) {
+                    IconButton(onClick = {
+                        photoPicker.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    }) {
+                        Icon(
+                            Icons.Rounded.AddPhotoAlternate,
+                            contentDescription = stringResource(R.string.chat_attach_image),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
                 BasicTextField(
                     value = input,
                     onValueChange = { input = it },
@@ -270,12 +344,11 @@ fun ChatScreen(
                 } else if (ui.isRecording) {
                     IconButton(onClick = {
                         // Gemma audio is one-shot per utterance; transcribing
-                        // happens after we stop. Show the user the spinner via
-                        // isGenerating already set by send(), and route the
-                        // result through the normal send pipeline.
+                        // happens after we stop. 转写结果回填输入框，让用户
+                        // 确认/修改后再自己点发送（与翻译页一致），不直接发。
                         scope.launch {
                             val text = vm.stopVoiceInputAndTranscribe()
-                            if (text.isNotBlank()) vm.send(text)
+                            if (text.isNotBlank()) input = text
                         }
                     }) {
                         Icon(
@@ -285,18 +358,19 @@ fun ChatScreen(
                         )
                     }
                 } else {
-                    if (input.isBlank()) {
-                        IconButton(onClick = {
-                            if (hasMic) vm.startVoiceInput()
-                            else micLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-                        }) {
-                            Icon(
-                                Icons.Rounded.Mic,
-                                contentDescription = stringResource(R.string.chat_voice_start),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    } else {
+                    // 麦克风：空闲时始终显示（包括已附图时，可对着图说问题）。
+                    IconButton(onClick = {
+                        if (hasMic) vm.startVoiceInput()
+                        else micLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }) {
+                        Icon(
+                            Icons.Rounded.Mic,
+                            contentDescription = stringResource(R.string.chat_voice_start),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    // 有文字或有附图即可发送。
+                    if (input.isNotBlank() || ui.attachedBitmap != null) {
                         IconButton(
                             onClick = {
                                 val text = input
@@ -315,7 +389,71 @@ fun ChatScreen(
             }
         }
     }
+
+    // 会话抽屉：列出全部会话，点击切换、垃圾桶删除（当前会话高亮）。
+    if (showSessions) {
+        ModalBottomSheet(onDismissRequest = { showSessions = false }) {
+            Text(
+                text = stringResource(R.string.chat_sessions),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+            if (sessions.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.chat_sessions_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .padding(bottom = 24.dp),
+                ) {
+                    items(sessions, key = { it.id }) { s ->
+                        val isCurrent = s.id == ui.sessionId
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    vm.openSession(s.id)
+                                    showSessions = false
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = s.title.ifBlank { stringResource(R.string.chat_session_untitled) },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (isCurrent) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = sessionTimeFmt.format(Date(s.updatedAt)),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(onClick = { vm.deleteSession(s.id) }) {
+                                Icon(
+                                    Icons.Rounded.DeleteOutline,
+                                    contentDescription = stringResource(R.string.chat_session_delete),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
+
+private val sessionTimeFmt = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
 
 @Composable
 private fun MessageBubble(msg: ChatMessageEntity) {
@@ -336,8 +474,17 @@ private fun MessageBubble(msg: ChatMessageEntity) {
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
             if (isUser) {
-                // User text is rendered as-is so literal asterisks stay visible.
-                Text(text = msg.content, color = fg, style = MaterialTheme.typography.bodyLarge)
+                // 用户气泡：有图先渲染图片，再渲染文字（文字可为空）。
+                Column(horizontalAlignment = Alignment.End) {
+                    msg.imageUri?.let { path ->
+                        BubbleImage(path)
+                        if (msg.content.isNotEmpty()) Spacer(Modifier.height(6.dp))
+                    }
+                    if (msg.content.isNotEmpty()) {
+                        // User text is rendered as-is so literal asterisks stay visible.
+                        Text(text = msg.content, color = fg, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
             } else {
                 // Assistant historical messages get the same Markdown polish
                 // as the streaming bubble — strips raw `**` / `*` / backticks
@@ -348,6 +495,26 @@ private fun MessageBubble(msg: ChatMessageEntity) {
                 )
             }
         }
+    }
+}
+
+/** 从本地文件路径异步解码并显示对话气泡里的图片。 */
+@Composable
+private fun BubbleImage(path: String) {
+    val bmp by produceState<android.graphics.Bitmap?>(initialValue = null, path) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { android.graphics.BitmapFactory.decodeFile(path) }.getOrNull()
+        }
+    }
+    bmp?.let {
+        Image(
+            bitmap = it.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .widthIn(max = 220.dp)
+                .clip(RoundedCornerShape(12.dp)),
+        )
     }
 }
 

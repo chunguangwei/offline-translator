@@ -87,9 +87,11 @@ class ModelDownloader @Inject constructor(
         src: ModelSource,
         customBase: String,
     ): List<String> = when (src) {
-        // HF_DIRECT and HF_MIRROR both use the registry's official URLs (currently hf-mirror.com).
-        ModelSource.HF_DIRECT -> listOf(info.urlHf)
-        ModelSource.HF_MIRROR -> listOf(info.urlMirror)
+        // 国内/国外互为兜底：首选源失败时自动顺延到另一个（download() 的 for 循环逐个重试）。
+        //  HF_DIRECT  → 国外(huggingface.co) 优先，国内(hf-mirror) 兜底
+        //  HF_MIRROR  → 国内(hf-mirror) 优先，国外(huggingface.co) 兜底
+        ModelSource.HF_DIRECT -> listOf(info.urlHf, info.urlMirror).distinct()
+        ModelSource.HF_MIRROR -> listOf(info.urlMirror, info.urlHf).distinct()
         // CUSTOM uses ONLY the user-supplied base URL — no silent fallback.
         ModelSource.CUSTOM -> {
             val base = customBase.trim()

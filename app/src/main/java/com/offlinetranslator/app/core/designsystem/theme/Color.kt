@@ -2,12 +2,13 @@ package com.offlinetranslator.app.core.designsystem.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Brand
-val BrandPrimary = Color(0xFF5B9BFF)
-val BrandPrimaryDark = Color(0xFF3D7BE0)
-val BrandSecondary = Color(0xFFA78BFA)
-val BrandSecondaryDark = Color(0xFF7C5FE0)
-val BrandTertiary = Color(0xFF22D3B5)
+// Brand — 暖色主题，对齐 logo 渐变（#FFB152 琥珀 → #FF6F61 珊瑚 → #C2479B 品红）。
+// 各界面通过 MaterialTheme.colorScheme.primary/secondary/tertiary 取色，改这里即全局换肤。
+val BrandPrimary = Color(0xFFFF6F61)       // 珊瑚（主色，logo 渐变中段）
+val BrandPrimaryDark = Color(0xFFE2564A)   // 深珊瑚（容器/暗态强调）
+val BrandSecondary = Color(0xFFFFB152)     // 琥珀（logo 渐变起点）
+val BrandSecondaryDark = Color(0xFFE08A2E)
+val BrandTertiary = Color(0xFFC2479B)      // 品红（logo 渐变末端，与主色构成暖色渐变）
 
 // Light
 val BgLight = Color(0xFFF7F8FB)

@@ -1,8 +1,13 @@
 package com.offlinetranslator.app.feature.translate
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,7 +15,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -26,6 +33,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -36,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -71,6 +81,7 @@ import com.offlinetranslator.app.R
 @Composable
 fun TranslateScreen(
     padding: PaddingValues,
+    onOpenModels: () -> Unit = {},
     vm: TranslateViewModel = hiltViewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -79,28 +90,80 @@ fun TranslateScreen(
     val snackbarHost = remember { SnackbarHostState() }
 
     LaunchedEffect(ui.error) { ui.error?.let { snackbarHost.showSnackbar(it) } }
+    // 进入/返回翻译页时预热引擎并刷新「模型缺失」状态（下载完返回即清掉横幅）。
+    LaunchedEffect(Unit) { vm.refreshModel() }
 
-    Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+    val micPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) vm.startVoiceInput() }
+
+    fun onMicClick() {
+        when {
+            ui.isRecording -> vm.stopVoiceInput()
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED -> vm.startVoiceInput()
+            else -> micPermLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // consumeWindowInsets + imePadding：键盘弹起时内容收缩上移（而非系统整窗平移
+    // 把内容顶进状态栏），与问答页一致。
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .consumeWindowInsets(padding)
+            .imePadding(),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
-            // Title
-            Text(
-                text = stringResource(R.string.translate_title),
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.sp,
-                ),
-                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-            )
-            Text(
-                text = stringResource(R.string.translate_subtitle),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            )
+            // Title — 标题/副标题。模型下载入口已移到「设置」Tab + 缺失横幅，不再放右上角。
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.translate_title),
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.sp,
+                    ),
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                Text(
+                    text = stringResource(R.string.translate_subtitle),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                )
+            }
+
+            // 模型缺失：顶部内联横幅（不遮挡下方内容），带「去下载」按钮。
+            if (ui.isModelMissing) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.translate_need_model),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onOpenModels) {
+                        Text(
+                            stringResource(R.string.translate_go_download),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
 
             Spacer(Modifier.height(20.dp))
 
@@ -116,6 +179,9 @@ fun TranslateScreen(
                         lang = ui.source,
                         text = ui.input,
                         onTextChange = vm::setInput,
+                        isRecording = ui.isRecording,
+                        isTranscribing = ui.isTranscribing,
+                        onMic = { onMicClick() },
                         onPaste = {
                             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             val t = cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
@@ -130,6 +196,7 @@ fun TranslateScreen(
                         lang = ui.target,
                         text = ui.output,
                         isTranslating = ui.isTranslating,
+                        loadingModel = ui.loadingModel,
                         onCopy = {
                             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             cm.setPrimaryClip(ClipData.newPlainText("translation", ui.output))
@@ -195,7 +262,10 @@ fun TranslateScreen(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        stringResource(R.string.translate_translating),
+                        stringResource(
+                            if (ui.loadingModel) R.string.translate_loading_model
+                            else R.string.translate_translating
+                        ),
                         fontWeight = FontWeight.SemiBold,
                     )
                 } else {
@@ -218,6 +288,9 @@ private fun SourceCard(
     lang: TranslateLang,
     text: String,
     onTextChange: (String) -> Unit,
+    isRecording: Boolean,
+    isTranscribing: Boolean,
+    onMic: () -> Unit,
     onPaste: () -> Unit,
     onClear: () -> Unit,
 ) {
@@ -233,6 +306,17 @@ private fun SourceCard(
                 lang = lang,
                 accentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (isRecording || isTranscribing) {
+                Text(
+                    text = stringResource(
+                        if (isRecording) R.string.translate_recording
+                        else R.string.translate_transcribing
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
             Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier
@@ -282,6 +366,15 @@ private fun SourceCard(
                         modifier = Modifier.padding(end = 4.dp),
                     )
                 }
+                IconButton(onClick = onMic) {
+                    Icon(
+                        imageVector = if (isRecording) Icons.Rounded.Stop else Icons.Rounded.Mic,
+                        contentDescription = stringResource(R.string.translate_voice),
+                        tint = if (isRecording) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
                 IconButton(onClick = onPaste) {
                     Icon(
                         Icons.Rounded.ContentPaste,
@@ -312,6 +405,7 @@ private fun TargetCard(
     lang: TranslateLang,
     text: String,
     isTranslating: Boolean,
+    loadingModel: Boolean,
     onCopy: () -> Unit,
 ) {
     Box(
@@ -350,7 +444,10 @@ private fun TargetCard(
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
-                                text = stringResource(R.string.translate_translating),
+                                text = stringResource(
+                                    if (loadingModel) R.string.translate_loading_model
+                                    else R.string.translate_translating
+                                ),
                                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
                                 color = MaterialTheme.colorScheme.primary,
                             )

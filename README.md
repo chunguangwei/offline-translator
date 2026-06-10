@@ -257,7 +257,7 @@ app/src/main/
 | --- | --- |
 | `README.md` | 项目说明（本文件） |
 | `CHANGELOG.md` | 版本更新历史 |
-| `LICENSE` | Apache 2.0 文本 |
+| `LICENSE` | 专有许可协议（商用需作者书面授权） |
 | `.gitignore` | 已涵盖 `*.apk` / `*.jks` / `local.properties` / `models/` / `Yiren-*.apk` 等 |
 | `build.gradle.kts` | 顶层 Gradle 脚本（插件版本管理） |
 | `settings.gradle.kts` | 模块声明 + 国内 Maven 镜像（阿里云 / 华为云） |
@@ -394,7 +394,9 @@ git push
 
 ## 📄 License
 
-[Apache License 2.0](LICENSE)
+**专有许可（Proprietary）** — 详见 [LICENSE](LICENSE)。
+
+版权所有 © 2026 weichunguang，保留所有权利。可出于个人学习、研究、评估目的查看、运行、修改与（非商业）分享，须保留本协议与版权声明；**任何商业用途须事先获得著作权人 weichunguang（chunguangwei@gmail.com）的书面同意**。
 
 第三方组件遵循各自原协议：
 - [LiteRT-LM SDK](https://github.com/google-ai-edge/litert-lm) — Apache 2.0
