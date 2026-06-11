@@ -1,10 +1,15 @@
 import Foundation
 
-/// 模型下载器 —— 与 Android `ModelDownloader` 同策略：
-/// 国内镜像（hf-mirror）优先、官方（huggingface.co）兜底，逐源重试。
-/// V1 不做断点续传（Android 端有，iOS 后续补），失败可重新下载。
+/// 模型下载器 —— 源顺序与 Android 一致：
+/// ModelScope(阿里云 OSS，国内最快) → hf-mirror → 官方。
+/// hf-mirror 对 HF Xet 仓库只 308 跳回被墙的 huggingface.co（无加速效果）。
+///
+/// 实现用系统 `URLSessionDownloadTask`（直写磁盘、系统级缓冲），
+/// 而非 `URLSession.AsyncBytes`——后者逐字节迭代，2.6GB 会被 CPU 卡死在
+/// 个位数 MB/s（用户真机实测"iOS 不快"的根因）。
+/// 断点续传走系统 resumeData（取消/失败时落盘，下次接着下）。
 @MainActor
-final class ModelDownloader: NSObject, ObservableObject {
+final class ModelDownloader: ObservableObject {
 
     enum Phase: Equatable {
         case idle
@@ -40,22 +45,29 @@ final class ModelDownloader: NSObject, ObservableObject {
         phases[model.id] = .idle
     }
 
+    private func resumeFile(_ model: ModelInfo) -> URL {
+        storage.modelsDir.appendingPathComponent("\(model.fileName).resume")
+    }
+
     private func run(_ model: ModelInfo) async {
-        // ModelScope(阿里云 OSS，国内最快) → hf-mirror → 官方，与 Android 一致。
-        // hf-mirror 对 HF Xet 仓库只 308 跳回被墙的 huggingface.co（"下载太慢"根因）。
         let sources = [model.urlModelScope, model.urlMirror, model.urlHf]
         var lastError = "下载失败"
         for url in sources {
             do {
                 try await fetch(model, from: url)
+                try? FileManager.default.removeItem(at: resumeFile(model))
                 phases[model.id] = .idle
                 return
             } catch is CancellationError {
                 phases[model.id] = .idle
                 return
+            } catch let urlError as URLError where urlError.code == .cancelled {
+                phases[model.id] = .idle
+                return
             } catch {
                 lastError = error.localizedDescription
-                // 换下一个源重试。
+                // 换下一个源重试（resumeData 只对同 URL 有效，换源前清掉）。
+                try? FileManager.default.removeItem(at: resumeFile(model))
             }
         }
         phases[model.id] = .failed(lastError)
@@ -63,74 +75,115 @@ final class ModelDownloader: NSObject, ObservableObject {
 
     private func fetch(_ model: ModelInfo, from url: URL) async throws {
         let dest = storage.fileURL(for: model)
-        let tmp = dest.appendingPathExtension("part")
+        let resumePath = resumeFile(model)
+        let resumeData = try? Data(contentsOf: resumePath)
 
-        // 断点续传：.part 已有内容就带 Range 续传（2.5GB 下载中断重来太痛）。
-        var existing: Int64 = 0
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: tmp.path),
-           let size = attrs[.size] as? Int64, size > 0 {
-            existing = size
-        }
-        var request = URLRequest(url: url)
-        if existing > 0 {
-            request.setValue("bytes=\(existing)-", forHTTPHeaderField: "Range")
-        }
-
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
-        // 服务端不支持 Range（200 而非 206）→ 从头来。
-        let resumed = http.statusCode == 206 && existing > 0
-        if !resumed {
-            try? FileManager.default.removeItem(at: tmp)
-            existing = 0
-        }
-        let total = http.expectedContentLength > 0
-            ? http.expectedContentLength + (resumed ? existing : 0)
-            : model.sizeBytes
-
-        if !FileManager.default.fileExists(atPath: tmp.path) {
-            FileManager.default.createFile(atPath: tmp.path, contents: nil)
-        }
-        let handle = try FileHandle(forWritingTo: tmp)
-        defer { try? handle.close() }
-        try handle.seekToEnd()
-
-        var buffer = Data()
-        buffer.reserveCapacity(1 << 20)
-        var downloaded: Int64 = existing
-        var lastReport = Date.distantPast
-
-        for try await byte in bytes {
-            buffer.append(byte)
-            if buffer.count >= 1 << 20 { // 1MB 批量落盘，避免频繁 IO
-                try handle.write(contentsOf: buffer)
-                downloaded += Int64(buffer.count)
-                buffer.removeAll(keepingCapacity: true)
-                try Task.checkCancellation()
-                // 进度上报节流到 ~4 次/秒，别刷爆主线程。
-                if Date().timeIntervalSince(lastReport) > 0.25 {
-                    lastReport = Date()
-                    let d = downloaded
-                    phases[model.id] = .downloading(
-                        fraction: Double(d) / Double(total), downloaded: d, total: total
-                    )
-                }
+        let downloader = FileDownloader { [weak self] written, total in
+            Task { @MainActor [weak self] in
+                guard let self, self.tasks[model.id] != nil else { return }
+                let t = total > 0 ? total : model.sizeBytes
+                self.phases[model.id] = .downloading(
+                    fraction: Double(written) / Double(t), downloaded: written, total: t
+                )
             }
         }
-        if !buffer.isEmpty {
-            try handle.write(contentsOf: buffer)
-            downloaded += Int64(buffer.count)
+
+        do {
+            let tempURL = try await downloader.download(URLRequest(url: url), resumeData: resumeData)
+            // 体积防呆：差太多视为坏档（防 CDN 截断 / 错误页面落盘）。
+            let size = (try? FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int64) ?? 0
+            guard size > model.sizeBytes / 2 else {
+                try? FileManager.default.removeItem(at: tempURL)
+                throw URLError(.cannotParseResponse)
+            }
+            try? FileManager.default.removeItem(at: dest)
+            try FileManager.default.moveItem(at: tempURL, to: dest)
+            // 下载完成自动激活 —— 与 Android 行为一致。
+            storage.activeModelId = model.id
+        } catch {
+            // 取消/失败时把系统 resumeData 落盘，下次接着下。
+            if let rd = downloader.takeResumeData() {
+                try? rd.write(to: resumePath)
+            }
+            throw error
         }
-        try handle.close()
+    }
+}
 
-        // 体积防呆：差太多视为坏档（防 CDN 截断 / 错误页面落盘）。
-        guard downloaded > model.sizeBytes / 2 else { throw URLError(.cannotParseResponse) }
-        try? FileManager.default.removeItem(at: dest)
-        try FileManager.default.moveItem(at: tmp, to: dest)
+/// 单文件下载封装：URLSessionDownloadTask + delegate 进度，async/await 出口，
+/// 支持 resumeData 续传与取消时产出 resumeData。
+private final class FileDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
 
-        // 下载完成自动激活 —— 与 Android 行为一致。
-        storage.activeModelId = model.id
+    private let onProgress: (Int64, Int64) -> Void
+    private var continuation: CheckedContinuation<URL, Error>?
+    private var task: URLSessionDownloadTask?
+    private var pendingResumeData: Data?
+    private var lastReport = Date.distantPast
+    private lazy var session = URLSession(
+        configuration: .default, delegate: self, delegateQueue: nil
+    )
+
+    init(onProgress: @escaping (Int64, Int64) -> Void) {
+        self.onProgress = onProgress
+    }
+
+    func takeResumeData() -> Data? {
+        defer { pendingResumeData = nil }
+        return pendingResumeData
+    }
+
+    func download(_ request: URLRequest, resumeData: Data?) async throws -> URL {
+        defer { session.finishTasksAndInvalidate() }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                continuation = cont
+                let t = resumeData.map { session.downloadTask(withResumeData: $0) }
+                    ?? session.downloadTask(with: request)
+                task = t
+                t.resume()
+            }
+        } onCancel: {
+            task?.cancel { [weak self] data in
+                self?.pendingResumeData = data
+            }
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        // 进度上报节流 ~4 次/秒。
+        let now = Date()
+        guard now.timeIntervalSince(lastReport) > 0.25 else { return }
+        lastReport = now
+        onProgress(totalBytesWritten, totalBytesExpectedToWrite)
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        // location 在本回调返回后即失效，必须先挪到稳定路径。
+        let stable = FileManager.default.temporaryDirectory
+            .appendingPathComponent("yiren-dl-\(UUID().uuidString)")
+        do {
+            try FileManager.default.moveItem(at: location, to: stable)
+            continuation?.resume(returning: stable)
+        } catch {
+            continuation?.resume(throwing: error)
+        }
+        continuation = nil
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard let error else { return } // 成功路径已在 didFinishDownloadingTo 处理
+        let ns = error as NSError
+        if let rd = ns.userInfo[NSURLSessionDownloadTaskResumeData] as? Data {
+            pendingResumeData = rd
+        }
+        continuation?.resume(throwing: error)
+        continuation = nil
     }
 }
