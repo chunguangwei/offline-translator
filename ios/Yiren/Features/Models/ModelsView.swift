@@ -2,7 +2,8 @@ import SwiftUI
 
 /// 模型管理页 —— 列表/下载（双源兜底）/激活/删除，对应 Android ModelsScreen。
 struct ModelsView: View {
-    @StateObject private var downloader = ModelDownloader()
+    // 共享单例：background session identifier 全 App 唯一，且锁屏/重启后能接回任务。
+    @ObservedObject private var downloader = ModelDownloader.shared
     @State private var refreshTick = 0 // 下载完/删除后驱动行状态刷新
     @Environment(\.dismiss) private var dismiss
 

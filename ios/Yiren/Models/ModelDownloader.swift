@@ -1,15 +1,23 @@
 import Foundation
+import UIKit
 
-/// 模型下载器 —— 源顺序与 Android 一致：
-/// ModelScope(阿里云 OSS，国内最快) → hf-mirror → 官方。
-/// hf-mirror 对 HF Xet 仓库只 308 跳回被墙的 huggingface.co（无加速效果）。
+/// 模型下载器（后台会话版）。
 ///
-/// 实现用系统 `URLSessionDownloadTask`（直写磁盘、系统级缓冲），
-/// 而非 `URLSession.AsyncBytes`——后者逐字节迭代，2.6GB 会被 CPU 卡死在
-/// 个位数 MB/s（用户真机实测"iOS 不快"的根因）。
-/// 断点续传走系统 resumeData（取消/失败时落盘，下次接着下）。
+/// 源顺序与 Android 一致：ModelScope(阿里云，国内最快) → hf-mirror → 官方。
+///
+/// 两个 iOS 平台坑的解法都在这里：
+/// 1. **锁屏/切后台下载中断**：用 `URLSessionConfiguration.background`，
+///    下载由系统 nsurlsessiond 进程执行——锁屏、挂起、甚至 App 被杀都继续；
+///    重开 App 重建同 identifier 会话自动接管在途任务（修"锁屏后重新下载"）。
+/// 2. **吞吐**：URLSessionDownloadTask 系统直写磁盘（此前 AsyncBytes 逐字节
+///    迭代把 2.6GB 卡死在个位数 MB/s）。
+///
+/// 失败重试：网络抖动产生的 resumeData 同源续传（最多 2 次），仍失败换下一源；
+/// 用户取消产生的 resumeData 落盘，下次点下载接着下。
 @MainActor
-final class ModelDownloader: ObservableObject {
+final class ModelDownloader: NSObject, ObservableObject {
+    /// 必须全局单例：background session identifier 全 App 唯一。
+    static let shared = ModelDownloader()
 
     enum Phase: Equatable {
         case idle
@@ -17,11 +25,42 @@ final class ModelDownloader: ObservableObject {
         case failed(String)
     }
 
-    /// modelId → 下载状态。
     @Published private(set) var phases: [String: Phase] = [:]
 
-    private var tasks: [String: Task<Void, Never>] = [:]
     private let storage = ModelStorage.shared
+    private var session: URLSession!
+    private let proxy = SessionDelegateProxy()
+    /// 用户主动取消的 modelId（didCompleteWithError 据此区分取消与失败）。
+    private var cancelRequested: Set<String> = []
+    /// 同源 resume 重试计数（"modelId|srcIdx" → 次数）。
+    private var resumeRetries: [String: Int] = [:]
+    private var lastReport = Date.distantPast
+
+    private override init() {
+        super.init()
+        proxy.owner = self
+        let cfg = URLSessionConfiguration.background(
+            withIdentifier: "com.offlinetranslator.yiren.model-download"
+        )
+        cfg.isDiscretionary = false
+        cfg.sessionSendsLaunchEvents = true
+        session = URLSession(configuration: cfg, delegate: proxy, delegateQueue: nil)
+        // App 启动：接回在途任务，恢复进度展示。
+        session.getAllTasks { tasks in
+            Task { @MainActor [weak self] in
+                for t in tasks where t.state == .running || t.state == .suspended {
+                    guard let modelId = Self.modelId(of: t) else { continue }
+                    let total = max(t.countOfBytesExpectedToReceive, 1)
+                    self?.phases[modelId] = .downloading(
+                        fraction: Double(t.countOfBytesReceived) / Double(total),
+                        downloaded: t.countOfBytesReceived, total: total
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - 对外接口
 
     func phase(for model: ModelInfo) -> Phase { phases[model.id] ?? .idle }
 
@@ -31,159 +70,193 @@ final class ModelDownloader: ObservableObject {
     }
 
     func download(_ model: ModelInfo) {
-        guard tasks[model.id] == nil else { return }
+        guard !isDownloading(model) else { return }
+        cancelRequested.remove(model.id)
+        resumeRetries = resumeRetries.filter { !$0.key.hasPrefix("\(model.id)|") }
         phases[model.id] = .downloading(fraction: 0, downloaded: 0, total: model.sizeBytes)
-        tasks[model.id] = Task { [weak self] in
-            await self?.run(model)
-            self?.tasks[model.id] = nil
-        }
+        startTask(model: model, sourceIndex: 0)
     }
 
     func cancel(_ model: ModelInfo) {
-        tasks[model.id]?.cancel()
-        tasks[model.id] = nil
+        cancelRequested.insert(model.id)
         phases[model.id] = .idle
-    }
-
-    private func resumeFile(_ model: ModelInfo) -> URL {
-        storage.modelsDir.appendingPathComponent("\(model.fileName).resume")
-    }
-
-    private func run(_ model: ModelInfo) async {
-        let sources = [model.urlModelScope, model.urlMirror, model.urlHf]
-        var lastError = "下载失败"
-        for url in sources {
-            do {
-                try await fetch(model, from: url)
-                try? FileManager.default.removeItem(at: resumeFile(model))
-                phases[model.id] = .idle
-                return
-            } catch is CancellationError {
-                phases[model.id] = .idle
-                return
-            } catch let urlError as URLError where urlError.code == .cancelled {
-                phases[model.id] = .idle
-                return
-            } catch {
-                lastError = error.localizedDescription
-                // 换下一个源重试（resumeData 只对同 URL 有效，换源前清掉）。
-                try? FileManager.default.removeItem(at: resumeFile(model))
+        session.getAllTasks { tasks in
+            for t in tasks where Self.modelId(of: t) == model.id {
+                (t as? URLSessionDownloadTask)?.cancel { [weak self] data in
+                    guard let data else { return }
+                    Task { @MainActor [weak self] in
+                        self?.saveResume(data, for: model, sourceIndex: Self.sourceIndex(of: t) ?? 0)
+                    }
+                }
             }
         }
-        phases[model.id] = .failed(lastError)
     }
 
-    private func fetch(_ model: ModelInfo, from url: URL) async throws {
+    // MARK: - 任务编排
+
+    private func sources(for model: ModelInfo) -> [URL] {
+        [model.urlModelScope, model.urlMirror, model.urlHf]
+    }
+
+    private func startTask(model: ModelInfo, sourceIndex: Int) {
+        let srcs = sources(for: model)
+        guard sourceIndex < srcs.count else {
+            phases[model.id] = .failed(PromptTemplates.isZhUi ? "所有下载源均失败，请稍后重试" : "All sources failed")
+            return
+        }
+        let url = srcs[sourceIndex]
+        let task: URLSessionDownloadTask
+        if let rd = loadResume(for: model, sourceIndex: sourceIndex) {
+            task = session.downloadTask(withResumeData: rd)
+        } else {
+            task = session.downloadTask(with: URLRequest(url: url))
+        }
+        task.taskDescription = "\(model.id)|\(sourceIndex)"
+        task.resume()
+    }
+
+    // MARK: - 代理回调入口（proxy 已切回主线程）
+
+    fileprivate func onProgress(modelId: String, written: Int64, expected: Int64) {
+        let now = Date()
+        guard now.timeIntervalSince(lastReport) > 0.25 else { return }
+        lastReport = now
+        guard !cancelRequested.contains(modelId) else { return }
+        let model = ModelRegistry.byId(modelId)
+        let total = expected > 0 ? written + max(expected - written, 0) : (model?.sizeBytes ?? 1)
+        phases[modelId] = .downloading(
+            fraction: Double(written) / Double(max(total, 1)), downloaded: written, total: total
+        )
+    }
+
+    fileprivate func onFinished(modelId: String, tempURL: URL) {
+        guard let model = ModelRegistry.byId(modelId) else { return }
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        let size = (try? FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int64) ?? 0
+        // 体积防呆：防 CDN 截断/错误页面落盘。
+        guard size > model.sizeBytes / 2 else {
+            phases[modelId] = .failed(PromptTemplates.isZhUi ? "下载内容异常，请重试" : "Corrupted download")
+            return
+        }
         let dest = storage.fileURL(for: model)
-        let resumePath = resumeFile(model)
-        let resumeData = try? Data(contentsOf: resumePath)
-
-        let downloader = FileDownloader { [weak self] written, total in
-            Task { @MainActor [weak self] in
-                guard let self, self.tasks[model.id] != nil else { return }
-                let t = total > 0 ? total : model.sizeBytes
-                self.phases[model.id] = .downloading(
-                    fraction: Double(written) / Double(t), downloaded: written, total: t
-                )
-            }
-        }
-
+        try? FileManager.default.removeItem(at: dest)
         do {
-            let tempURL = try await downloader.download(URLRequest(url: url), resumeData: resumeData)
-            // 体积防呆：差太多视为坏档（防 CDN 截断 / 错误页面落盘）。
-            let size = (try? FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int64) ?? 0
-            guard size > model.sizeBytes / 2 else {
-                try? FileManager.default.removeItem(at: tempURL)
-                throw URLError(.cannotParseResponse)
-            }
-            try? FileManager.default.removeItem(at: dest)
             try FileManager.default.moveItem(at: tempURL, to: dest)
-            // 下载完成自动激活 —— 与 Android 行为一致。
-            storage.activeModelId = model.id
+            clearResume(for: model)
+            storage.activeModelId = model.id // 下载完成自动激活，与 Android 一致
+            phases[modelId] = .idle
         } catch {
-            // 取消/失败时把系统 resumeData 落盘，下次接着下。
-            if let rd = downloader.takeResumeData() {
-                try? rd.write(to: resumePath)
-            }
-            throw error
+            phases[modelId] = .failed(error.localizedDescription)
         }
+    }
+
+    fileprivate func onFailed(modelId: String, sourceIndex: Int, resumeData: Data?, isCancelled: Bool, message: String) {
+        guard let model = ModelRegistry.byId(modelId) else { return }
+        if isCancelled {
+            // 用户主动取消：resumeData 已在 cancel() 落盘；静默归位。
+            if cancelRequested.remove(modelId) != nil { phases[modelId] = .idle }
+            return
+        }
+        if let resumeData {
+            saveResume(resumeData, for: model, sourceIndex: sourceIndex)
+            // 网络抖动 → 同源续传重试（最多 2 次），不浪费已下载的部分。
+            let key = "\(modelId)|\(sourceIndex)"
+            let n = resumeRetries[key, default: 0]
+            if n < 2 {
+                resumeRetries[key] = n + 1
+                startTask(model: model, sourceIndex: sourceIndex)
+                return
+            }
+        }
+        // 换下一个源（resumeData 只对同 URL 有效，清掉）。
+        clearResume(for: model)
+        _ = message // 中间源失败信息不打扰用户，最终全失败才提示
+        startTask(model: model, sourceIndex: sourceIndex + 1)
+    }
+
+    // MARK: - resumeData 持久化（key 带源序号，换源不串）
+
+    private func resumeFile(for model: ModelInfo, sourceIndex: Int) -> URL {
+        storage.modelsDir.appendingPathComponent("\(model.fileName).resume\(sourceIndex)")
+    }
+
+    private func saveResume(_ data: Data, for model: ModelInfo, sourceIndex: Int) {
+        try? data.write(to: resumeFile(for: model, sourceIndex: sourceIndex))
+    }
+
+    private func loadResume(for model: ModelInfo, sourceIndex: Int) -> Data? {
+        let f = resumeFile(for: model, sourceIndex: sourceIndex)
+        defer { try? FileManager.default.removeItem(at: f) } // 一次性使用
+        return try? Data(contentsOf: f)
+    }
+
+    private func clearResume(for model: ModelInfo) {
+        for i in 0..<3 {
+            try? FileManager.default.removeItem(at: resumeFile(for: model, sourceIndex: i))
+        }
+    }
+
+    // MARK: - util
+
+    fileprivate nonisolated static func modelId(of task: URLSessionTask) -> String? {
+        task.taskDescription?.split(separator: "|").first.map(String.init)
+    }
+
+    fileprivate nonisolated static func sourceIndex(of task: URLSessionTask) -> Int? {
+        guard let parts = task.taskDescription?.split(separator: "|"), parts.count == 2 else { return nil }
+        return Int(parts[1])
     }
 }
 
-/// 单文件下载封装：URLSessionDownloadTask + delegate 进度，async/await 出口，
-/// 支持 resumeData 续传与取消时产出 resumeData。
-private final class FileDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-
-    private let onProgress: (Int64, Int64) -> Void
-    private var continuation: CheckedContinuation<URL, Error>?
-    private var task: URLSessionDownloadTask?
-    private var pendingResumeData: Data?
-    private var lastReport = Date.distantPast
-    private lazy var session = URLSession(
-        configuration: .default, delegate: self, delegateQueue: nil
-    )
-
-    init(onProgress: @escaping (Int64, Int64) -> Void) {
-        self.onProgress = onProgress
-    }
-
-    func takeResumeData() -> Data? {
-        defer { pendingResumeData = nil }
-        return pendingResumeData
-    }
-
-    func download(_ request: URLRequest, resumeData: Data?) async throws -> URL {
-        defer { session.finishTasksAndInvalidate() }
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { cont in
-                continuation = cont
-                let t = resumeData.map { session.downloadTask(withResumeData: $0) }
-                    ?? session.downloadTask(with: request)
-                task = t
-                t.resume()
-            }
-        } onCancel: {
-            task?.cancel { [weak self] data in
-                self?.pendingResumeData = data
-            }
-        }
-    }
+/// 后台会话代理：回调在后台队列，统一切主线程交给 ModelDownloader。
+private final class SessionDelegateProxy: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    weak var owner: ModelDownloader?
 
     func urlSession(
         _ session: URLSession, downloadTask: URLSessionDownloadTask,
         didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
-        // 进度上报节流 ~4 次/秒。
-        let now = Date()
-        guard now.timeIntervalSince(lastReport) > 0.25 else { return }
-        lastReport = now
-        onProgress(totalBytesWritten, totalBytesExpectedToWrite)
+        guard let modelId = ModelDownloader.modelId(of: downloadTask) else { return }
+        Task { @MainActor [weak owner] in
+            owner?.onProgress(modelId: modelId, written: totalBytesWritten, expected: totalBytesExpectedToWrite)
+        }
     }
 
     func urlSession(
         _ session: URLSession, downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
-        // location 在本回调返回后即失效，必须先挪到稳定路径。
+        guard let modelId = ModelDownloader.modelId(of: downloadTask) else { return }
+        // location 在回调返回后即失效，必须同步先挪走。
         let stable = FileManager.default.temporaryDirectory
             .appendingPathComponent("yiren-dl-\(UUID().uuidString)")
         do {
             try FileManager.default.moveItem(at: location, to: stable)
-            continuation?.resume(returning: stable)
-        } catch {
-            continuation?.resume(throwing: error)
+        } catch { return }
+        Task { @MainActor [weak owner] in
+            owner?.onFinished(modelId: modelId, tempURL: stable)
         }
-        continuation = nil
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard let error else { return } // 成功路径已在 didFinishDownloadingTo 处理
+        guard let error, let modelId = ModelDownloader.modelId(of: task) else { return }
+        let srcIdx = ModelDownloader.sourceIndex(of: task) ?? 0
         let ns = error as NSError
-        if let rd = ns.userInfo[NSURLSessionDownloadTaskResumeData] as? Data {
-            pendingResumeData = rd
+        let resumeData = ns.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+        let cancelled = ns.code == NSURLErrorCancelled
+        Task { @MainActor [weak owner] in
+            owner?.onFailed(modelId: modelId, sourceIndex: srcIdx,
+                            resumeData: resumeData, isCancelled: cancelled,
+                            message: error.localizedDescription)
         }
-        continuation?.resume(throwing: error)
-        continuation = nil
+    }
+
+    /// 后台事件投递完毕 → 调用系统给的 completion（App 被后台唤醒收尾用）。
+    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        DispatchQueue.main.async {
+            AppDelegate.backgroundSessionCompletion?()
+            AppDelegate.backgroundSessionCompletion = nil
+        }
     }
 }
