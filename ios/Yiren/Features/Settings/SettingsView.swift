@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 设置 Tab —— 对应 Android SettingsScreen：主题/推理后端/模型管理/关于与许可。
 /// 无「应用更新」：iOS 由 App Store 承担（平台差异）；
@@ -6,6 +7,8 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("themeMode") private var themeMode = "system"
     @AppStorage("backendPref") private var backendPref = "AUTO"
+    @AppStorage("modelSourcePref") private var modelSource = "CN_FIRST"
+    @AppStorage("customMirrorBase") private var customMirrorBase = ""
     @ObservedObject private var gemma = GemmaService.shared
     @State private var showModels = false
 
@@ -26,6 +29,14 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
+                Section(zh ? "语言" : "Language") {
+                    Button(zh ? "应用语言（到系统设置切换）" : "App language (system settings)") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                }
+
                 Section(zh ? "模型" : "Model") {
                     Button {
                         showModels = true
@@ -39,6 +50,20 @@ struct SettingsView: View {
                         }
                     }
                     .foregroundStyle(.primary)
+
+                    Picker(zh ? "下载源" : "Download source", selection: $modelSource) {
+                        Text(zh ? "国内优先（魔搭）" : "CN first (ModelScope)").tag("CN_FIRST")
+                        Text(zh ? "官方优先（HF）" : "Official first (HF)").tag("OFFICIAL")
+                        Text(zh ? "自定义镜像" : "Custom mirror").tag("CUSTOM")
+                        Text(zh ? "仅本地" : "Local only").tag("LOCAL_ONLY")
+                    }
+                    if modelSource == "CUSTOM" {
+                        TextField("https://your-mirror.example.com/path/", text: $customMirrorBase)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                            .font(.footnote)
+                    }
                 }
 
                 Section {

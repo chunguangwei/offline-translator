@@ -12,10 +12,14 @@ final class TranslateViewModel: ObservableObject {
     @Published var loadingModel = false
     /// 还没下载模型 —— 顶部内联横幅（不是报错）。
     @Published var isModelMissing = false
+    @Published var isRecording = false
+    @Published var isTranscribing = false
     @Published var errorMessage: String?
 
     private let gemma = GemmaService.shared
+    private let recorder = AudioRecorder.shared
     private var task: Task<Void, Never>?
+    private var zh: Bool { PromptTemplates.isZhUi }
 
     /// 页面出现/模型页返回时调用：预热引擎并刷新缺失横幅。
     func refreshModel() {
@@ -99,6 +103,62 @@ final class TranslateViewModel: ObservableObject {
         task?.cancel()
         isTranslating = false
         loadingModel = false
+    }
+
+    // MARK: - 语音输入（与 Android 翻译页一致：转写回填输入框，用户确认后再翻译）
+
+    func startVoice() async {
+        guard !isRecording, !isTranslating, !isTranscribing else { return }
+        guard await recorder.requestPermission() else {
+            errorMessage = zh ? "需要麦克风权限" : "Microphone permission required"
+            return
+        }
+        do {
+            try recorder.start()
+            isRecording = true
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func stopVoiceAndFill() async {
+        guard isRecording else { return }
+        let pcm = recorder.stop()
+        isRecording = false
+        guard pcm.count > 16_000 else { // < 0.5s
+            errorMessage = zh ? "录音太短，请多说一会儿" : "Recording too short"
+            return
+        }
+        guard AudioRecorder.peak(of: pcm) > 0.01 else {
+            errorMessage = zh ? "没采到声音，请检查麦克风" : "No audio captured"
+            return
+        }
+        isTranscribing = true
+        loadingModel = true
+        defer { isTranscribing = false }
+
+        if case .failure(let f) = await gemma.ensureLoaded() {
+            loadingModel = false
+            if case .modelMissing = f { isModelMissing = true }
+            return
+        }
+        loadingModel = false
+        guard gemma.audioEnabled else {
+            errorMessage = zh ? "当前模型未启用语音识别" : "Audio is not enabled"
+            return
+        }
+        do {
+            let wav = AudioRecorder.wavData(from: pcm)
+            let stream = try await gemma.transcribe(wav: wav, zh: sourceIsZh)
+            var acc = ""
+            for try await d in stream {
+                acc += d
+                input = acc.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func clear() {

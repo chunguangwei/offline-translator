@@ -66,9 +66,34 @@ struct TranslateView: View {
 
     private var sourceCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(vm.sourceIsZh ? "中文" : "English")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandPrimary)
+            HStack {
+                Text(vm.sourceIsZh ? "中文" : "English")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.brandPrimary)
+                Spacer()
+                // 语音输入：录音 → 离线转写回填输入框（与 Android 翻译页一致）。
+                if vm.isTranscribing {
+                    ProgressView().controlSize(.small)
+                    Text("正在转写…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if vm.isRecording {
+                    Text("正在聆听…")
+                        .font(.caption)
+                        .foregroundStyle(Color.brandPrimary)
+                    Button { Task { await vm.stopVoiceAndFill() } } label: {
+                        Image(systemName: "stop.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.red)
+                    }
+                } else {
+                    Button { Task { await vm.startVoice() } } label: {
+                        Image(systemName: "mic.fill")
+                            .foregroundStyle(Color.brandPrimary)
+                    }
+                    .disabled(vm.isTranslating)
+                }
+            }
             TextEditor(text: $vm.input)
                 .frame(minHeight: 120)
                 .font(.body)

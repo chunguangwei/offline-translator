@@ -1,6 +1,22 @@
 import Foundation
 import UIKit
 
+/// 模型下载源偏好 —— 对应 Android ModelSource（设置页可选）。
+enum ModelSourcePref: String, CaseIterable {
+    /// 国内优先：ModelScope(阿里云) → hf-mirror → 官方（默认）。
+    case cnFirst = "CN_FIRST"
+    /// 官方优先：huggingface.co → ModelScope → hf-mirror。
+    case official = "OFFICIAL"
+    /// 自定义镜像 base URL（仅用它，不静默兜底）。
+    case custom = "CUSTOM"
+    /// 仅本地：不联网下载。
+    case localOnly = "LOCAL_ONLY"
+
+    static var current: ModelSourcePref {
+        ModelSourcePref(rawValue: UserDefaults.standard.string(forKey: "modelSourcePref") ?? "CN_FIRST") ?? .cnFirst
+    }
+}
+
 /// 模型下载器（后台会话版）。
 ///
 /// 源顺序与 Android 一致：ModelScope(阿里云，国内最快) → hf-mirror → 官方。
@@ -71,6 +87,15 @@ final class ModelDownloader: NSObject, ObservableObject {
 
     func download(_ model: ModelInfo) {
         guard !isDownloading(model) else { return }
+        let zh = PromptTemplates.isZhUi
+        guard !sources(for: model).isEmpty else {
+            phases[model.id] = .failed(
+                ModelSourcePref.current == .localOnly
+                    ? (zh ? "已设为「仅本地」模式，请到设置改为其它模型源" : "Local-only mode: change the model source in Settings")
+                    : (zh ? "未配置自定义下载地址，请到「设置」填写" : "Custom mirror URL not configured")
+            )
+            return
+        }
         cancelRequested.remove(model.id)
         resumeRetries = resumeRetries.filter { !$0.key.hasPrefix("\(model.id)|") }
         phases[model.id] = .downloading(fraction: 0, downloaded: 0, total: model.sizeBytes)
@@ -95,7 +120,17 @@ final class ModelDownloader: NSObject, ObservableObject {
     // MARK: - 任务编排
 
     private func sources(for model: ModelInfo) -> [URL] {
-        [model.urlModelScope, model.urlMirror, model.urlHf]
+        switch ModelSourcePref.current {
+        case .cnFirst: return [model.urlModelScope, model.urlMirror, model.urlHf]
+        case .official: return [model.urlHf, model.urlModelScope, model.urlMirror]
+        case .custom:
+            let base = (UserDefaults.standard.string(forKey: "customMirrorBase") ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !base.isEmpty else { return [] }
+            let s = base.hasSuffix("/") ? base + model.fileName : base + "/" + model.fileName
+            return URL(string: s).map { [$0] } ?? []
+        case .localOnly: return []
+        }
     }
 
     private func startTask(model: ModelInfo, sourceIndex: Int) {
