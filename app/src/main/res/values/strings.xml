@@ -68,6 +68,7 @@
     <!-- Chat -->
     <string name="chat_title">问答</string>
     <string name="chat_input_hint">问点什么，或上传图片…</string>
+    <string name="chat_image_preview">查看图片</string>
     <string name="chat_image_remove">移除图片</string>
     <string name="chat_sessions">会话</string>
     <string name="chat_sessions_empty">暂无会话</string>

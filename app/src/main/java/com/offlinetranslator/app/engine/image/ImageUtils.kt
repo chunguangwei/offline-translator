@@ -5,8 +5,12 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 
-/** 把相册 Uri 解码为适合 Gemma 视觉输入的 Bitmap（最长边缩到 target px）。失败返回 null。 */
-fun decodeBitmapForGemma(context: Context, uri: Uri, target: Int = 768): Bitmap? =
+/**
+ * 把相册 Uri 解码为适合 Gemma 视觉输入的 Bitmap（最长边缩到 target px）。失败返回 null。
+ * target=896 贴近 Gemma 视觉编码器原生输入分辨率——密集文字（海报/文档）多留细节，
+ * 再大引擎也会缩回去，只浪费内存。
+ */
+fun decodeBitmapForGemma(context: Context, uri: Uri, target: Int = 896): Bitmap? =
     runCatching {
         context.contentResolver.openInputStream(uri).use { input ->
             val original = BitmapFactory.decodeStream(input) ?: return null

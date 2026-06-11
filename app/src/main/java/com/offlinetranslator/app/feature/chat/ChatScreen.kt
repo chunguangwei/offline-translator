@@ -86,6 +86,8 @@ fun ChatScreen(
     val sessions by vm.sessions.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     var showSessions by remember { mutableStateOf(false) }
+    // 全屏图片预览：Bitmap（发送前的附件）或 String 文件路径（气泡里的图）。
+    var previewImage by remember { mutableStateOf<Any?>(null) }
     val listState = rememberLazyListState()
 
     // Mic permission
@@ -164,7 +166,7 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(messages, key = { it.id }) { msg ->
-                MessageBubble(msg)
+                MessageBubble(msg, onImageClick = { path -> previewImage = path })
             }
             if (ui.streamingContent.isNotEmpty() || ui.isGenerating) {
                 item("streaming") {
@@ -267,7 +269,10 @@ fun ChatScreen(
                     bitmap = bmp.asImageBitmap(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { previewImage = bmp },
                 )
                 Spacer(Modifier.width(8.dp))
                 IconButton(onClick = vm::clearImage) {
@@ -390,6 +395,11 @@ fun ChatScreen(
         }
     }
 
+    // 全屏图片预览（发送前附件 / 气泡图都走这里）。
+    previewImage?.let { img ->
+        FullScreenImageViewer(image = img, onDismiss = { previewImage = null })
+    }
+
     // 会话抽屉：列出全部会话，点击切换、垃圾桶删除（当前会话高亮）。
     if (showSessions) {
         ModalBottomSheet(onDismissRequest = { showSessions = false }) {
@@ -456,7 +466,7 @@ fun ChatScreen(
 private val sessionTimeFmt = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
 
 @Composable
-private fun MessageBubble(msg: ChatMessageEntity) {
+private fun MessageBubble(msg: ChatMessageEntity, onImageClick: (String) -> Unit = {}) {
     val isUser = msg.role == "user"
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -477,7 +487,7 @@ private fun MessageBubble(msg: ChatMessageEntity) {
                 // 用户气泡：有图先渲染图片，再渲染文字（文字可为空）。
                 Column(horizontalAlignment = Alignment.End) {
                     msg.imageUri?.let { path ->
-                        BubbleImage(path)
+                        BubbleImage(path, onClick = { onImageClick(path) })
                         if (msg.content.isNotEmpty()) Spacer(Modifier.height(6.dp))
                     }
                     if (msg.content.isNotEmpty()) {
@@ -498,9 +508,9 @@ private fun MessageBubble(msg: ChatMessageEntity) {
     }
 }
 
-/** 从本地文件路径异步解码并显示对话气泡里的图片。 */
+/** 从本地文件路径异步解码并显示对话气泡里的图片（点击全屏预览）。 */
 @Composable
-private fun BubbleImage(path: String) {
+private fun BubbleImage(path: String, onClick: () -> Unit = {}) {
     val bmp by produceState<android.graphics.Bitmap?>(initialValue = null, path) {
         value = withContext(Dispatchers.IO) {
             runCatching { android.graphics.BitmapFactory.decodeFile(path) }.getOrNull()
@@ -509,12 +519,57 @@ private fun BubbleImage(path: String) {
     bmp?.let {
         Image(
             bitmap = it.asImageBitmap(),
-            contentDescription = null,
+            contentDescription = stringResource(R.string.chat_image_preview),
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .widthIn(max = 220.dp)
-                .clip(RoundedCornerShape(12.dp)),
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick),
         )
+    }
+}
+
+/**
+ * 全屏图片预览：暗底 + 适配屏幕，点任意处关闭。
+ * [image] 支持 Bitmap（发送前附件）或 String 文件路径（气泡图）。
+ */
+@Composable
+private fun FullScreenImageViewer(image: Any, onDismiss: () -> Unit) {
+    val bitmap: android.graphics.Bitmap? = when (image) {
+        is android.graphics.Bitmap -> image
+        is String -> produceState<android.graphics.Bitmap?>(initialValue = null, image) {
+            value = withContext(Dispatchers.IO) {
+                runCatching { android.graphics.BitmapFactory.decodeFile(image) }.getOrNull()
+            }
+        }.value
+        else -> null
+    }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            bitmap?.let {
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = stringResource(R.string.chat_image_preview),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(12.dp),
+                )
+            }
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 12.dp),
+            ) {
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White)
+            }
+        }
     }
 }
 

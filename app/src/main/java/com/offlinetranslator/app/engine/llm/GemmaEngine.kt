@@ -286,6 +286,13 @@ class GemmaEngine @Inject constructor(
     ): Pair<List<Backend>, List<Backend?>> {
         val gpuFirst: List<Backend> = listOf(Backend.GPU(), Backend.CPU())
         val cpuOnly: List<Backend> = listOf(Backend.CPU())
+        // 视觉编码器 AUTO 档改为 CPU 优先：部分设备的 GPU 驱动上编码器能初始化
+        // 但推理产出异常向量，模型表现为"看不到图"（用户真机实测）。编码是
+        // 单次前缀代价，CPU 慢一点但跨设备稳定；主模型(decode)不受影响仍 GPU 优先。
+        // 音频编码器随视觉走同一后端（见上方 ab 的取值逻辑）。
+        val visionCpuFirst: List<Backend?> =
+            if (info.supportsImage) listOf(Backend.CPU(), Backend.GPU(), null)
+            else listOf(null)
         val visionGpuFirst: List<Backend?> =
             if (info.supportsImage) listOf(Backend.GPU(), Backend.CPU(), null)
             else listOf(null)
@@ -293,7 +300,8 @@ class GemmaEngine @Inject constructor(
             if (info.supportsImage) listOf(Backend.CPU(), null)
             else listOf(null)
         return when (pref) {
-            InferenceBackend.AUTO -> gpuFirst to visionGpuFirst
+            InferenceBackend.AUTO -> gpuFirst to visionCpuFirst
+            // 用户手选 GPU：尊重选择仍让视觉先试 GPU（backendFellBack 会提示降级）。
             InferenceBackend.GPU -> gpuFirst to visionGpuFirst
             InferenceBackend.CPU -> cpuOnly to visionCpuOnly
         }

@@ -57,9 +57,40 @@ object PromptTemplates {
         return wrap(body)
     }
 
-    fun chatSystem(): String =
+    /** 应用当前是否中文环境（跟随系统/应用内语言设置，per-app locale 会改写进程默认 Locale）。 */
+    private val isZhUi: Boolean
+        get() = java.util.Locale.getDefault().language.startsWith("zh")
+
+    /**
+     * 系统提示词跟随应用语言：离线小模型对英文 system prompt 有强烈的英文回复倾向
+    （用户真机实测中文提问也回英文），中文环境必须用中文明确要求。
+     */
+    fun chatSystem(): String = if (isZhUi) {
+        "你是一个完全在设备本地运行的智能助手。回答要简洁、有帮助。" +
+            "默认使用简体中文回答；只有当用户用其他语言提问时，才用对方的语言回答。"
+    } else {
         "You are an intelligent assistant running fully on-device. Be concise, helpful, " +
             "and respond in the user's language. If the user mixes languages, mirror them."
+    }
+
+    /** 历史里带图轮次的标注（让模型知道哪轮发过图）。 */
+    fun historyImageNote(content: String): String {
+        val note = if (isZhUi) "（发送了一张图片）" else "(sent an image) "
+        return if (content.isBlank()) note.trim() else note + content
+    }
+
+    /** 上下文压缩摘要的承上启下两轮（user/assistant），文案随应用语言。 */
+    fun summaryBridgeTurns(summary: String): List<Pair<String, String>> = if (isZhUi) {
+        listOf(
+            "user" to "（此前对话的摘要）$summary",
+            "assistant" to "好的，我已了解上文。",
+        )
+    } else {
+        listOf(
+            "user" to "(Summary of our earlier conversation) $summary",
+            "assistant" to "Got it, I'm caught up.",
+        )
+    }
 
     /**
      * 多轮对话 prompt。history 含用户与助手双方消息，窗口大小由调用方控制
@@ -106,9 +137,19 @@ object PromptTemplates {
             if (role == "user") sb.append(USER_OPEN).append(content.trim()).append(TURN_END)
             else sb.append(MODEL_OPEN).append(content.trim()).append(TURN_END)
         }
-        val q = userInput.ifBlank { "请识别并描述这张图片的内容。" }
-        val marker = if (refed) "（随消息附上我此前发过的那张图片，请结合它回答）"
-        else "（我发送了一张图片）"
+        // 指令必须命令式：小模型偶尔意识不到附件存在而反过来索要图片，
+        // 明确告知"图片已附上、直接回答、别再要"。文案随应用语言。
+        val q: String
+        val marker: String
+        if (isZhUi) {
+            q = userInput.ifBlank { "请识别并描述这张图片的内容。" }
+            marker = if (refed) "（随本条消息重新附上了我此前发过的那张图片，请结合它回答。）"
+            else "（一张图片已随本条消息一并发给你了，请直接基于这张图片回答，不要再让我提供图片。）"
+        } else {
+            q = userInput.ifBlank { "Describe what you see in this image." }
+            marker = if (refed) "(My earlier image is re-attached to this message; answer with it in mind.) "
+            else "(An image IS attached to this message. Answer directly based on it; do not ask me to provide one.) "
+        }
         sb.append(USER_OPEN).append(marker).append(q).append(TURN_END)
         sb.append(MODEL_OPEN)
         return sb.toString()

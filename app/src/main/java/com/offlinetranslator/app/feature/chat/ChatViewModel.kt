@@ -269,16 +269,13 @@ class ChatViewModel @Inject constructor(
             // 会显式追加它，不会重复。仅当总字数超预算（压缩还没跟上）才裁掉最旧的兜底。
             val session = dao.getSession(sid)
             val unsummarized = dao.messagesOnce(sid).drop(session?.summarizedCount ?: 0)
-            val summaryTurns = session?.summary?.takeIf { it.isNotBlank() }?.let {
-                listOf("user" to "（此前对话的摘要）$it", "assistant" to "好的，我已了解上文。")
-            } ?: emptyList()
+            // 摘要桥接/图片标注文案统一收口在 PromptTemplates（随应用语言中英切换）。
+            val summaryTurns = session?.summary?.takeIf { it.isNotBlank() }
+                ?.let { PromptTemplates.summaryBridgeTurns(it) } ?: emptyList()
             // 带图轮次在历史里显式标注，模型才知道哪轮发过图、图和哪句话对应。
             val rawTurns = unsummarized.map { m ->
-                m.role to when {
-                    m.imageUri != null && m.content.isBlank() -> "（发送了一张图片）"
-                    m.imageUri != null -> "（发送了一张图片）${m.content}"
-                    else -> m.content
-                }
+                m.role to if (m.imageUri != null) PromptTemplates.historyImageNote(m.content)
+                else m.content
             }
             val historyBefore = summaryTurns + fitContextBudget(rawTurns)
             // 文件写入/JPEG 压缩是阻塞 IO，挪到 IO 线程，别卡主线程。

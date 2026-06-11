@@ -62,6 +62,7 @@
 
     <string name="chat_title">Q&amp;A</string>
     <string name="chat_input_hint">Ask anything, or attach an image…</string>
+    <string name="chat_image_preview">View image</string>
     <string name="chat_image_remove">Remove image</string>
     <string name="chat_sessions">Sessions</string>
     <string name="chat_sessions_empty">No sessions yet</string>
