@@ -25,20 +25,43 @@ enum Samplers {
     static let chat = try? SamplerConfig(topK: 40, topP: 0.95, temperature: 0.7)
 }
 
-/// 对 LiteRT-LM 的应用层封装 —— 对应 Android `GemmaEngine.kt`。
-/// 单实例；加载策略与 Android 一致：GPU 优先，初始化失败回退 CPU。
-/// V1 纯文本，vision/audio 编码器不启用（省内存、加载更快），后续阶段打开。
+/// 推理后端偏好（设置页可选，对应 Android InferenceBackend）。
+enum BackendPref: String, CaseIterable {
+    case auto = "AUTO"
+    case gpu = "GPU"
+    case cpu = "CPU"
+
+    static var current: BackendPref {
+        BackendPref(rawValue: UserDefaults.standard.string(forKey: "backendPref") ?? "AUTO") ?? .auto
+    }
+}
+
 @MainActor
 final class GemmaService: ObservableObject {
     static let shared = GemmaService()
 
     @Published private(set) var state: EngineState = .idle
     @Published private(set) var activeModel: ModelInfo?
+    /// 实际协商出的后端描述（设置页展示，如 "GPU"/"CPU"）。
+    @Published private(set) var activeBackendLabel: String = "—"
+    /// 当前加载是否启用了视觉/音频编码器。
+    @Published private(set) var visionEnabled = false
+    @Published private(set) var audioEnabled = false
 
     private var engine: Engine?
     private var loadedModelId: String?
+    private var loadedBackendPref: BackendPref?
     private var currentConversation: Conversation?
     private let storage = ModelStorage.shared
+
+    /// 设置页切了后端 → 下次 ensureLoaded 重载。
+    func invalidateForBackendChange() {
+        if loadedBackendPref != BackendPref.current {
+            engine = nil
+            loadedModelId = nil
+            state = .idle
+        }
+    }
 
     /// 确保目标模型已加载进内存。幂等：已加载同一模型直接返回。
     func ensureLoaded() async -> Result<ModelInfo, EngineFailure> {
@@ -63,37 +86,52 @@ final class GemmaService: ObservableObject {
         state = .loading
         activeModel = info
 
-        // GPU 优先，失败回退 CPU —— 与 Android backendChain(AUTO) 一致。
+        // 主模型按偏好（AUTO/GPU = GPU 优先回退 CPU；CPU = 仅 CPU）。
+        // 视觉/音频编码器一律 CPU（与 Android 决策一致：部分设备 GPU 编码器
+        // 初始化成功但输出异常向量）；编码器失败逐级降配 (有图有音)→(仅图)→(纯文本)。
+        let pref = BackendPref.current
+        let mains: [Backend] = pref == .cpu ? [.cpu()] : [.gpu, .cpu()]
+        var encoderCombos: [(Backend?, Backend?)] = [(nil, nil)]
+        if info.supportsImage && info.supportsAudio {
+            encoderCombos = [(.cpu(), .cpu()), (.cpu(), nil), (nil, nil)]
+        } else if info.supportsImage {
+            encoderCombos = [(.cpu(), nil), (nil, nil)]
+        }
+
         var lastError = "engine init failed"
-        for backend in [Backend.gpu, Backend.cpu()] {
-            do {
-                let config = try EngineConfig(
-                    modelPath: file.path,
-                    backend: backend,
-                    visionBackend: nil,
-                    audioBackend: nil,
-                    maxNumTokens: info.maxTokens,
-                    // 缓存必须落可写目录：模型可能在只读的 App 包内（随包预置），
-                    // 默认"模型同目录"会写失败。
-                    cacheDir: storage.modelsDir.path
-                )
-                let candidate = Engine(engineConfig: config)
-                try await candidate.initialize()
-                engine = candidate
-                loadedModelId = info.id
-                state = .ready
-                return .success(info)
-            } catch {
-                lastError = String(describing: error)
-                continue
+        for main in mains {
+            for (vision, audio) in encoderCombos {
+                do {
+                    let config = try EngineConfig(
+                        modelPath: file.path,
+                        backend: main,
+                        visionBackend: vision,
+                        audioBackend: audio,
+                        maxNumTokens: info.maxTokens,
+                        // 缓存必须落可写目录：模型可能在只读的 App 包内。
+                        cacheDir: storage.modelsDir.path
+                    )
+                    let candidate = Engine(engineConfig: config)
+                    try await candidate.initialize()
+                    engine = candidate
+                    loadedModelId = info.id
+                    loadedBackendPref = pref
+                    visionEnabled = vision != nil
+                    audioEnabled = audio != nil
+                    activeBackendLabel = (main.rawValue == "gpu") ? "GPU" : "CPU"
+                    state = .ready
+                    return .success(info)
+                } catch {
+                    lastError = String(describing: error)
+                    continue
+                }
             }
         }
         state = .error(lastError)
         return .failure(.initFailed(lastError))
     }
 
-    /// 流式生成：每次新建 Conversation（多轮上下文由调用方拼进 prompt，与 Android 同策略），
-    /// 文本增量经 [PromptTemplates.trimAtStop] 防御性裁剪后产出。
+    /// 单轮流式生成（翻译等无历史任务）。
     func generateStream(
         prompt: String,
         sampler: SamplerConfig? = Samplers.chat
@@ -103,9 +141,49 @@ final class GemmaService: ObservableObject {
             with: ConversationConfig(samplerConfig: sampler)
         )
         currentConversation = conversation
-        let inner = conversation.sendMessageStream(Message(prompt))
+        return textStream(from: conversation.sendMessageStream(Message(prompt)))
+    }
 
-        return AsyncThrowingStream<String, Error> { continuation in
+    /// 多轮问答流式生成 —— 用 LiteRT-LM 原生会话：system + 历史 initialMessages +
+    /// 当前用户消息（可带图片/音频 Content），模板渲染交给引擎（比 Android 手拼干净）。
+    func chatStream(
+        history: [Message],
+        user: Message,
+        sampler: SamplerConfig? = Samplers.chat
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        guard let engine else { throw EngineFailure.notLoaded }
+        let conversation = try await engine.createConversation(
+            with: ConversationConfig(
+                systemMessage: Message(PromptTemplates.chatSystem(), role: .system),
+                initialMessages: history,
+                samplerConfig: sampler
+            )
+        )
+        currentConversation = conversation
+        return textStream(from: conversation.sendMessageStream(user))
+    }
+
+    /// 语音逐字转写（单轮，低温采样保证忠实）。
+    func transcribe(wav: Data, zh: Bool) async throws -> AsyncThrowingStream<String, Error> {
+        guard let engine else { throw EngineFailure.notLoaded }
+        guard audioEnabled else { throw EngineFailure.initFailed("audio encoder not enabled") }
+        let conversation = try await engine.createConversation(
+            with: ConversationConfig(samplerConfig: Samplers.precise)
+        )
+        currentConversation = conversation
+        let message = Message(contents: [
+            .audioData(wav),
+            .text(PromptTemplates.transcribeVerbatim(zh: zh)),
+        ])
+        return textStream(from: conversation.sendMessageStream(message))
+    }
+
+    /// 把引擎的 Message 流转成干净的文本增量流：
+    /// 兼容增量/累计两种流式约定（Android 端踩过的坑）+ 停止符防御裁剪。
+    private func textStream(
+        from inner: AsyncThrowingStream<Message, Error>
+    ) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream<String, Error> { continuation in
             let task = Task {
                 // 兼容增量/累计两种流式约定（Android 端踩过的坑）：
                 // 新块若以已发文本为前缀则视为累计，只发 delta。

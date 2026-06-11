@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// 翻译页状态机 —— 对应 Android `TranslateViewModel.kt`（V1 无语音/历史）。
 @MainActor
@@ -68,6 +69,22 @@ final class TranslateViewModel: ObservableObject {
                     output += delta
                 }
                 isTranslating = false
+                // 翻译成功 → 写入历史（同原文+方向去重，只留最新一条）。
+                let final = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !final.isEmpty, !Task.isCancelled {
+                    let ctx = DataStore.context
+                    let src = text
+                    let sl = fromZh ? "ZH" : "EN"
+                    let tl = fromZh ? "EN" : "ZH"
+                    let dup = FetchDescriptor<TranslationRecord>(
+                        predicate: #Predicate { $0.sourceText == src && $0.sourceLang == sl && $0.targetLang == tl }
+                    )
+                    for old in (try? ctx.fetch(dup)) ?? [] { ctx.delete(old) }
+                    ctx.insert(TranslationRecord(
+                        sourceText: src, translatedText: final, sourceLang: sl, targetLang: tl
+                    ))
+                    try? ctx.save()
+                }
             } catch {
                 if !Task.isCancelled {
                     errorMessage = error.localizedDescription
