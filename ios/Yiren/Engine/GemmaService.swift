@@ -157,17 +157,24 @@ final class GemmaService: ObservableObject {
         return .failure(.initFailed(lastError))
     }
 
-    /// 单轮流式生成（翻译等无历史任务）。
+    /// 单轮流式生成（翻译等无历史任务）；可附一张图（拍照翻译）。
     func generateStream(
         prompt: String,
-        sampler: SamplerConfig? = Samplers.chat
+        sampler: SamplerConfig? = Samplers.chat,
+        imageData: Data? = nil
     ) async throws -> AsyncThrowingStream<String, Error> {
-        try await gatedStream { engine in
+        if imageData != nil, !visionEnabled {
+            throw EngineFailure.initFailed("vision encoder not enabled")
+        }
+        return try await gatedStream { engine in
             try await engine.createConversation(
                 with: ConversationConfig(samplerConfig: sampler)
             )
         } send: { conversation in
-            conversation.sendMessageStream(Message(prompt))
+            var contents: [Content] = []
+            if let imageData { contents.append(.imageData(imageData)) }
+            contents.append(.text(prompt))
+            return conversation.sendMessageStream(Message(contents: contents))
         }
     }
 
@@ -176,12 +183,13 @@ final class GemmaService: ObservableObject {
     func chatStream(
         history: [Message],
         user: Message,
+        system: String = PromptTemplates.chatSystem(),
         sampler: SamplerConfig? = Samplers.chat
     ) async throws -> AsyncThrowingStream<String, Error> {
         try await gatedStream { engine in
             try await engine.createConversation(
                 with: ConversationConfig(
-                    systemMessage: Message(PromptTemplates.chatSystem(), role: .system),
+                    systemMessage: Message(system, role: .system),
                     initialMessages: history,
                     samplerConfig: sampler
                 )

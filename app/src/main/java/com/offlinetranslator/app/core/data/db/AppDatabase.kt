@@ -83,6 +83,8 @@ data class TranslationEntity(
     val sourceLang: String, // "ZH" | "EN"
     val targetLang: String,
     val createdAt: Long,
+    /** 收藏进生词本（单词练习用）。 */
+    val starred: Boolean = false,
 )
 
 @Dao
@@ -99,6 +101,10 @@ interface TranslationDao {
             "AND sourceLang = :sourceLang AND targetLang = :targetLang"
     )
     suspend fun deleteDuplicates(sourceText: String, sourceLang: String, targetLang: String)
+
+    /** 收藏/取消收藏（生词本）。 */
+    @Query("UPDATE translation_history SET starred = :starred WHERE id = :id")
+    suspend fun setStarred(id: Long, starred: Boolean)
 
     @Query("DELETE FROM translation_history WHERE id = :id")
     suspend fun delete(id: Long)
@@ -128,9 +134,16 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/** v3→v4：翻译历史加生词本收藏列。 */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE translation_history ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [ChatSessionEntity::class, ChatMessageEntity::class, TranslationEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

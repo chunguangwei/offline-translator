@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UIKit
 
 /// 翻译页状态机 —— 对应 Android `TranslateViewModel.kt`（V1 无语音/历史）。
 @MainActor
@@ -103,6 +104,68 @@ final class TranslateViewModel: ObservableObject {
         task?.cancel()
         isTranslating = false
         loadingModel = false
+    }
+
+    /**
+     * 拍照/选图翻译：识别图中文字逐行「原文 => 译文」对照，结果流式进译文区。
+     * 输入框保持原样；不写翻译历史（无文字原文可去重）。
+     */
+    func translateImage(_ image: UIImage) {
+        guard !isTranslating, !isTranscribing else { return }
+        task?.cancel()
+        isTranslating = true
+        loadingModel = true
+        output = ""
+        errorMessage = nil
+        task = Task {
+            switch await gemma.ensureLoaded() {
+            case .failure(let f):
+                loadingModel = false
+                isTranslating = false
+                if case .modelMissing = f { isModelMissing = true }
+                return
+            case .success:
+                loadingModel = false
+                isModelMissing = false
+            }
+            guard gemma.visionEnabled else {
+                errorMessage = zh ? "当前模型未启用图像识别" : "Vision is not enabled"
+                isTranslating = false
+                return
+            }
+            // 最长边缩到 896（贴近 Gemma 视觉编码原生输入）。
+            let resized = Self.resize(image, maxSide: 896)
+            guard let data = resized.jpegData(compressionQuality: 0.9) else {
+                errorMessage = zh ? "图片处理失败" : "Image processing failed"
+                isTranslating = false
+                return
+            }
+            do {
+                let stream = try await gemma.generateStream(
+                    prompt: PromptTemplates.visionTranslateText(),
+                    sampler: Samplers.precise,
+                    imageData: data
+                )
+                for try await delta in stream {
+                    if Task.isCancelled { break }
+                    output += delta
+                }
+                isTranslating = false
+            } catch {
+                if !Task.isCancelled { errorMessage = error.localizedDescription }
+                isTranslating = false
+            }
+        }
+    }
+
+    private static func resize(_ img: UIImage, maxSide: CGFloat) -> UIImage {
+        let m = max(img.size.width, img.size.height)
+        guard m > maxSide else { return img }
+        let scale = maxSide / m
+        let size = CGSize(width: img.size.width * scale, height: img.size.height * scale)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            img.draw(in: CGRect(origin: .zero, size: size))
+        }
     }
 
     // MARK: - 语音输入（与 Android 翻译页一致：转写回填输入框，用户确认后再翻译）

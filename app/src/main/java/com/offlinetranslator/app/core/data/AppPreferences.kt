@@ -30,6 +30,8 @@ data class AppPreferences(
     val firstLaunch: Boolean = true,
     /** Custom download base URL (used when [modelSource] = CUSTOM). Should end with `/`. */
     val customMirrorBase: String = "",
+    /** 问答角色预设 id（default/translator/grammar/polish/speaking），见 PromptTemplates.chatSystem。 */
+    val chatRole: String = "default",
 )
 
 @Singleton
@@ -45,6 +47,7 @@ class AppPreferencesRepository @Inject constructor(
         val BACKEND = stringPreferencesKey("backend")
         val FIRST = booleanPreferencesKey("first_launch")
         val CUSTOM_MIRROR = stringPreferencesKey("custom_mirror_base")
+        val CHAT_ROLE = stringPreferencesKey("chat_role")
     }
 
     val flow: Flow<AppPreferences> = context.appDataStore.data.map { prefs ->
@@ -60,6 +63,7 @@ class AppPreferencesRepository @Inject constructor(
                 .getOrDefault(InferenceBackend.AUTO),
             firstLaunch = prefs[Keys.FIRST] ?: true,
             customMirrorBase = prefs[Keys.CUSTOM_MIRROR] ?: "",
+            chatRole = prefs[Keys.CHAT_ROLE] ?: "default",
         )
     }
 
@@ -75,4 +79,5 @@ class AppPreferencesRepository @Inject constructor(
     suspend fun setCustomMirrorBase(url: String) = context.appDataStore.edit {
         it[Keys.CUSTOM_MIRROR] = url.trim()
     }
+    suspend fun setChatRole(role: String) = context.appDataStore.edit { it[Keys.CHAT_ROLE] = role }
 }

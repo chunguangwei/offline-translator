@@ -6,6 +6,7 @@ struct ChatView: View {
     @StateObject private var vm = ChatViewModel()
     @State private var input = ""
     @State private var showSessions = false
+    @AppStorage("chatRole") private var chatRole = "default"
     @State private var photoItem: PhotosPickerItem?
     /// 全屏图片预览（UIImage 或文件路径）。
     @State private var previewImage: UIImage?
@@ -35,6 +36,23 @@ struct ChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    // 角色预设菜单（默认助手/翻译官/语法老师/写作润色/口语陪练）。
+                    Menu {
+                        ForEach(PromptTemplates.chatRoles, id: \.self) { id in
+                            Button {
+                                chatRole = id
+                            } label: {
+                                if id == chatRole {
+                                    Label(PromptTemplates.roleLabel(id), systemImage: "checkmark")
+                                } else {
+                                    Text(PromptTemplates.roleLabel(id))
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "theatermasks")
+                            .foregroundStyle(chatRole == "default" ? Color.primary : Color.brandPrimary)
+                    }
                     Button { showSessions = true } label: { Image(systemName: "clock.arrow.circlepath") }
                     Button {
                         vm.startNewSession()

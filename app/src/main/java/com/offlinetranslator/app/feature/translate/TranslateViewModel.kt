@@ -33,6 +33,7 @@ data class TranslateUi(
 
 @HiltViewModel
 class TranslateViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val engine: GemmaEngine,
     private val recorder: com.offlinetranslator.app.engine.audio.PcmAudioRecorder,
     private val translationDao: com.offlinetranslator.app.core.data.db.TranslationDao,
@@ -103,6 +104,44 @@ class TranslateViewModel @Inject constructor(
                 }
             } catch (ce: kotlinx.coroutines.CancellationException) {
                 // 用户主动取消 —— 不是错误，保留已译出的部分即可。
+                throw ce
+            } catch (t: Throwable) {
+                _ui.update { it.copy(isTranslating = false, error = t.message) }
+            }
+        }
+    }
+
+    /**
+     * 拍照/选图翻译：识别图中文字并逐行「原文 => 译文」对照，结果流式进译文区。
+     * 输入框保持原样（图片不是文字输入）；不写翻译历史（无文字原文可去重）。
+     */
+    fun translateImage(uri: android.net.Uri) {
+        val cur = _ui.value
+        if (cur.isTranslating || cur.isTranscribing) return
+        job?.cancel()
+        _ui.update { it.copy(isTranslating = true, loadingModel = true, output = "", error = null) }
+        job = viewModelScope.launch {
+            val bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.offlinetranslator.app.engine.image.decodeBitmapForGemma(context, uri)
+            }
+            if (bmp == null) {
+                _ui.update { it.copy(isTranslating = false, loadingModel = false, error = "图片解码失败，请换一张") }
+                return@launch
+            }
+            engine.ensureLoaded().onFailure { e ->
+                val missing = e is com.offlinetranslator.app.engine.llm.ModelMissingException
+                _ui.update {
+                    it.copy(isTranslating = false, loadingModel = false,
+                        isModelMissing = missing, error = if (missing) null else e.message)
+                }
+                return@launch
+            }
+            _ui.update { it.copy(loadingModel = false, isModelMissing = false) }
+            try {
+                engine.generateStream(PromptTemplates.visionTranslateText(), includeImage = bmp)
+                    .collect { token -> _ui.update { it.copy(output = it.output + token) } }
+                _ui.update { it.copy(isTranslating = false) }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
                 throw ce
             } catch (t: Throwable) {
                 _ui.update { it.copy(isTranslating = false, error = t.message) }

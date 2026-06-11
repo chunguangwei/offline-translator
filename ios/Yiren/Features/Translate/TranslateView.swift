@@ -1,9 +1,13 @@
+import PhotosUI
 import SwiftUI
 
-/// 翻译页 —— 与 Android 翻译 Tab 的结构/暖色风格一致（V1 无语音输入）。
+/// 翻译页 —— 与 Android 翻译 Tab 功能一致（文字/语音/拍照/选图翻译）。
 struct TranslateView: View {
     @StateObject private var vm = TranslateViewModel()
     @State private var showModels = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var showCamera = false
+    @State private var shareImage: UIImage?
 
     var body: some View {
         NavigationStack {
@@ -35,6 +39,26 @@ struct TranslateView: View {
             .onAppear { vm.refreshModel() }
             .sheet(isPresented: $showModels, onDismiss: { vm.refreshModel() }) {
                 ModelsView()
+            }
+            .sheet(item: $shareImage) { img in
+                ActivityView(items: [img])
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPicker { image in
+                    showCamera = false
+                    if let image { vm.translateImage(image) }
+                }
+                .ignoresSafeArea()
+            }
+            .onChange(of: photoItem) { _, item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let ui = UIImage(data: data) {
+                        vm.translateImage(ui)
+                    }
+                    photoItem = nil
+                }
             }
         }
     }
@@ -89,6 +113,17 @@ struct TranslateView: View {
                             .foregroundStyle(.red)
                     }
                 } else {
+                    // 拍照翻译 / 选图翻译（识别图中文字逐行对照译出）。
+                    Button { showCamera = true } label: {
+                        Image(systemName: "camera.fill")
+                            .foregroundStyle(Color.brandPrimary)
+                    }
+                    .disabled(vm.isTranslating)
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        Image(systemName: "photo")
+                            .foregroundStyle(Color.brandPrimary)
+                    }
+                    .disabled(vm.isTranslating)
                     Button { Task { await vm.startVoice() } } label: {
                         Image(systemName: "mic.fill")
                             .foregroundStyle(Color.brandPrimary)
@@ -131,9 +166,25 @@ struct TranslateView: View {
 
     private var targetCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(vm.sourceIsZh ? "English" : "中文")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.brandTertiary)
+            HStack {
+                Text(vm.sourceIsZh ? "English" : "中文")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.brandTertiary)
+                Spacer()
+                if !vm.output.isEmpty && !vm.isTranslating {
+                    // 品牌分享卡片（渐变卡图 → 系统分享面板）。
+                    Button {
+                        shareImage = ShareCardView.render(
+                            source: vm.input.trimmingCharacters(in: .whitespacesAndNewlines),
+                            translated: vm.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.brandPrimary)
+                    }
+                }
+            }
             Group {
                 if vm.loadingModel {
                     Label(zh ? "正在加载模型，请稍等…" : "Loading model, please wait…", systemImage: "hourglass")

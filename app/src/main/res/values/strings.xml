@@ -69,6 +69,12 @@
     <string name="chat_title">问答</string>
     <string name="chat_input_hint">问点什么，或上传图片…</string>
     <string name="chat_image_preview">查看图片</string>
+    <string name="chat_role">角色</string>
+    <string name="chat_role_default">默认助手</string>
+    <string name="chat_role_translator">翻译官</string>
+    <string name="chat_role_grammar">语法老师</string>
+    <string name="chat_role_polish">写作润色</string>
+    <string name="chat_role_speaking">口语陪练</string>
     <string name="chat_image_remove">移除图片</string>
     <string name="chat_sessions">会话</string>
     <string name="chat_sessions_empty">暂无会话</string>
@@ -215,6 +221,20 @@
     <string name="splash_tagline_2">中英互译 · 语音 · 图片问答</string>
     <string name="splash_tagline_3">Gemma 多模态本地引擎</string>
     <string name="splash_skip">跳过 %1$ds</string>
+    <string name="translate_camera">拍照翻译</string>
+    <string name="translate_share">分享卡片</string>
+    <string name="translate_gallery">选图翻译</string>
+    <string name="history_filter_all">全部</string>
+    <string name="history_filter_starred">生词本</string>
+    <string name="history_star">收藏到生词本</string>
+    <string name="history_starred_empty">还没有收藏的生词\n点历史记录的星标加入生词本</string>
+    <string name="practice_start">开始练习</string>
+    <string name="practice_progress">第 %1$d / %2$d 张</string>
+    <string name="practice_tap_reveal">点击卡片看译文</string>
+    <string name="practice_again">再练</string>
+    <string name="practice_know">认识</string>
+    <string name="practice_done">本轮全部记住了！</string>
+    <string name="practice_close">完成</string>
 
     <!-- About / License -->
     <string name="settings_about">关于与许可</string>

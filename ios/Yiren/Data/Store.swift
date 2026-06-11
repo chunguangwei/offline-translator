@@ -52,14 +52,18 @@ final class TranslationRecord {
     var sourceLang: String
     var targetLang: String
     var createdAt: Date
+    /** 收藏进生词本（单词练习用）。带默认值，SwiftData 轻量迁移自动处理。 */
+    var starred: Bool = false
 
     init(sourceText: String, translatedText: String,
-         sourceLang: String, targetLang: String, createdAt: Date = .now) {
+         sourceLang: String, targetLang: String, createdAt: Date = .now,
+         starred: Bool = false) {
         self.sourceText = sourceText
         self.translatedText = translatedText
         self.sourceLang = sourceLang
         self.targetLang = targetLang
         self.createdAt = createdAt
+        self.starred = starred
     }
 }
 

@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.offlinetranslator.app.BuildConfig
 import com.offlinetranslator.app.R
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 // 与 branding/yiren-icon-master.svg 完全一致的角色路径（1024 视口）。
@@ -171,6 +172,8 @@ private fun BlinkingLogo(modifier: Modifier = Modifier) {
     val headPath = remember { PathParser().parsePathString(HEAD_PATH).toPath() }
     val bodyPath = remember { PathParser().parsePathString(BODY_PATH).toPath() }
     val blink = remember { Animatable(1f) }
+    val bounce = remember { Animatable(1f) }
+    var tapTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -185,9 +188,31 @@ private fun BlinkingLogo(modifier: Modifier = Modifier) {
         }
     }
 
+    // 彩蛋：点角色 → 弹一下 + 连眨两下。
+    LaunchedEffect(tapTick) {
+        if (tapTick > 0) {
+            launch {
+                bounce.animateTo(1.12f, tween(120))
+                bounce.animateTo(1f, tween(220, easing = LinearOutSlowInEasing))
+            }
+            blink.animateTo(0.06f, tween(80)); blink.animateTo(1f, tween(130))
+            delay(140)
+            blink.animateTo(0.06f, tween(80)); blink.animateTo(1f, tween(130))
+        }
+    }
+
     androidx.compose.foundation.Canvas(
         // Offscreen 合成层：DstOut 才能真正"擦"出镂空眼睛。
-        modifier = modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = bounce.value
+                scaleY = bounce.value
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null, // 无水波纹，纯彩蛋
+            ) { tapTick++ },
     ) {
         val s = size.minDimension / 1024f
         withTransform({ scale(s, s, pivot = Offset.Zero) }) {

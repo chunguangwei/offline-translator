@@ -200,9 +200,11 @@ final class ChatViewModel: ObservableObject {
             errorMessage = nil
 
             do {
+                let role = UserDefaults.standard.string(forKey: "chatRole") ?? "default"
                 let stream = try await gemma.chatStream(
                     history: history,
-                    user: Message(contents: contents, role: .user)
+                    user: Message(contents: contents, role: .user),
+                    system: PromptTemplates.chatSystem(role: role)
                 )
                 var acc = ""
                 for try await delta in stream {

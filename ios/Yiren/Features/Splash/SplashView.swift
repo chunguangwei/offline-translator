@@ -99,8 +99,24 @@ struct SplashView: View {
 /// 眼睛 destinationOut 真镂空透出渐变，随机眨眼（30% 连眨两下）。
 private struct BlinkingLogo: View {
     @State private var blink: CGFloat = 1
+    @State private var bounce: CGFloat = 1
 
     var body: some View {
+        logoCanvas
+            .scaleEffect(bounce)
+            // 彩蛋：点角色 → 弹一下 + 连眨两下。
+            .onTapGesture {
+                Task {
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.45)) { bounce = 1.12 }
+                    await doBlink()
+                    try? await Task.sleep(for: .milliseconds(120))
+                    await doBlink()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { bounce = 1 }
+                }
+            }
+    }
+
+    private var logoCanvas: some View {
         Canvas { ctx, size in
             let s = min(size.width, size.height) / 1024
             ctx.scaleBy(x: s, y: s)

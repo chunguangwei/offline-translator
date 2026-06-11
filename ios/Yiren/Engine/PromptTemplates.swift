@@ -23,15 +23,73 @@ enum PromptTemplates {
     /// 应用当前是否中文环境（跟随系统/应用语言）。
     static var isZhUi: Bool { Locale.preferredLanguages.first?.hasPrefix("zh") ?? false }
 
-    /// 问答系统提示词 —— 随应用语言。离线小模型对英文 system prompt 有强烈的
-    /// 英文回复倾向（Android 真机实测），中文环境必须用中文明确要求。
-    static func chatSystem() -> String {
+    /// 问答角色预设 id 列表（与 Android 一致）。
+    static let chatRoles = ["default", "translator", "grammar", "polish", "speaking"]
+
+    /// 角色展示名（菜单用）。
+    static func roleLabel(_ id: String) -> String {
         if isZhUi {
-            return "你是一个完全在设备本地运行的智能助手。回答要简洁、有帮助。"
-                + "默认使用简体中文回答；只有当用户用其他语言提问时，才用对方的语言回答。"
+            switch id {
+            case "translator": return "翻译官"
+            case "grammar": return "语法老师"
+            case "polish": return "写作润色"
+            case "speaking": return "口语陪练"
+            default: return "默认助手"
+            }
         }
-        return "You are an intelligent assistant running fully on-device. Be concise, helpful, "
-            + "and respond in the user's language. If the user mixes languages, mirror them."
+        switch id {
+        case "translator": return "Translator"
+        case "grammar": return "Grammar coach"
+        case "polish": return "Writing polish"
+        case "speaking": return "Speaking partner"
+        default: return "Assistant"
+        }
+    }
+
+    /// 问答系统提示词 —— 随应用语言 + 角色预设。离线小模型对英文 system prompt
+    /// 有强烈的英文回复倾向（真机实测），中文环境必须用中文明确要求。
+    static func chatSystem(role: String = "default") -> String {
+        if isZhUi {
+            switch role {
+            case "translator":
+                return "你是一位专业翻译官，完全在设备本地运行。用户发来任何文字，给出准确、地道的译文"
+                    + "（中文→英文、英文→中文自动判断），必要时补充一两条关键词或语气说明。只做翻译相关回答。"
+            case "grammar":
+                return "你是一位耐心的英语语法老师，完全在设备本地运行。用简体中文讲解：指出用户句子的语法问题、"
+                    + "给出修改后的句子、解释为什么，并举一个相似例句。鼓励为主，简明扼要。"
+            case "polish":
+                return "你是一位写作润色专家，完全在设备本地运行。把用户的文字改得更通顺、自然、有表现力，"
+                    + "保持原意和原语言，输出润色稿，并用一两句话说明主要修改点。"
+            case "speaking":
+                return "You are a friendly English speaking partner running fully on-device. "
+                    + "Chat with the user in simple, natural English. After each reply, if the user's "
+                    + "English had mistakes, gently show the corrected sentence in one line starting with \"✏️\"."
+            default:
+                return "你是一个完全在设备本地运行的智能助手。回答要简洁、有帮助。"
+                    + "默认使用简体中文回答；只有当用户用其他语言提问时，才用对方的语言回答。"
+            }
+        }
+        switch role {
+        case "translator":
+            return "You are a professional translator running fully on-device. For any text the user sends, "
+                + "produce an accurate, idiomatic translation (auto-detect ZH→EN / EN→ZH); optionally add "
+                + "one or two key-word notes. Stay on translation tasks."
+        case "grammar":
+            return "You are a patient English grammar teacher running fully on-device. Point out grammar issues "
+                + "in the user's sentence, give the corrected version, explain why, and add one similar example. "
+                + "Be encouraging and concise."
+        case "polish":
+            return "You are a writing-polish expert running fully on-device. Rewrite the user's text to be smoother, "
+                + "more natural and expressive, keeping the meaning and language. Output the polished version, "
+                + "then one or two sentences on the key changes."
+        case "speaking":
+            return "You are a friendly English speaking partner running fully on-device. Chat in simple, natural "
+                + "English. After each reply, if the user's English had mistakes, gently show the corrected "
+                + "sentence in one line starting with \"✏️\"."
+        default:
+            return "You are an intelligent assistant running fully on-device. Be concise, helpful, "
+                + "and respond in the user's language. If the user mixes languages, mirror them."
+        }
     }
 
     /// 语音逐字转写（翻译/问答的语音输入法：转写回填输入框，用户确认后再发）。
@@ -85,6 +143,17 @@ enum PromptTemplates {
             ? "(My earlier image is re-attached to this message; answer with it in mind.) "
             : "(An image IS attached to this message. Answer directly based on it; do not ask me to provide one.) "
         return marker + q
+    }
+
+    /// 拍照/选图翻译：识别图中文字并逐行「原文 => 译文」对照（中英互译自动判向）。
+    static func visionTranslateText() -> String {
+        if isZhUi {
+            return "你能看到附带的图片。找出图片里的全部文字，把每一行翻译成对应的另一种语言"
+                + "（中文→英文、英文→中文）。按「原文 => 译文」格式逐行输出，不要其他内容。"
+        }
+        return "You can see the attached image. Find ALL the text in the image, then translate "
+            + "every line into the OPPOSITE language (Chinese ↔ English). "
+            + "Output as: \"<original> => <translation>\" per line, nothing else."
     }
 
     static func translate(_ text: String, fromZh: Bool) -> String {

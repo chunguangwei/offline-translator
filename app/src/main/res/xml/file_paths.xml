@@ -7,6 +7,8 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="camera_captures" path="camera/" />
     <files-path name="camera_files" path="camera/" />
+    <!-- 译文分享卡片 PNG。 -->
+    <cache-path name="share" path="share/" />
     <!-- Downloaded APK for the in-app self-updater. -->
     <cache-path name="update" path="update/" />
 </paths>

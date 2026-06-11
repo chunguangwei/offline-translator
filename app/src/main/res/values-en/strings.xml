@@ -63,6 +63,12 @@
     <string name="chat_title">Q&amp;A</string>
     <string name="chat_input_hint">Ask anything, or attach an image…</string>
     <string name="chat_image_preview">View image</string>
+    <string name="chat_role">Role</string>
+    <string name="chat_role_default">Assistant</string>
+    <string name="chat_role_translator">Translator</string>
+    <string name="chat_role_grammar">Grammar coach</string>
+    <string name="chat_role_polish">Writing polish</string>
+    <string name="chat_role_speaking">Speaking partner</string>
     <string name="chat_image_remove">Remove image</string>
     <string name="chat_sessions">Sessions</string>
     <string name="chat_sessions_empty">No sessions yet</string>
@@ -205,6 +211,20 @@
     <string name="splash_tagline_2">ZH ⇄ EN · Voice · Image Q&amp;A</string>
     <string name="splash_tagline_3">Powered by Gemma, locally</string>
     <string name="splash_skip">Skip %1$ds</string>
+    <string name="translate_camera">Camera translate</string>
+    <string name="translate_share">Share card</string>
+    <string name="translate_gallery">Photo translate</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_filter_starred">Word book</string>
+    <string name="history_star">Star into word book</string>
+    <string name="history_starred_empty">No starred words yet\nTap the star on a history item to add it</string>
+    <string name="practice_start">Practice</string>
+    <string name="practice_progress">Card %1$d / %2$d</string>
+    <string name="practice_tap_reveal">Tap card to reveal</string>
+    <string name="practice_again">Again</string>
+    <string name="practice_know">Got it</string>
+    <string name="practice_done">All done for this round!</string>
+    <string name="practice_close">Done</string>
 
     <!-- About / License -->
     <string name="settings_about">About &amp; License</string>

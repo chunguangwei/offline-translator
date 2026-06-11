@@ -61,16 +61,54 @@ object PromptTemplates {
     private val isZhUi: Boolean
         get() = java.util.Locale.getDefault().language.startsWith("zh")
 
+    /** 问答角色预设 id 列表（设置/问答页菜单用，文案见 string 资源 chat_role_*）。 */
+    val chatRoles = listOf("default", "translator", "grammar", "polish", "speaking")
+
     /**
-     * 系统提示词跟随应用语言：离线小模型对英文 system prompt 有强烈的英文回复倾向
-    （用户真机实测中文提问也回英文），中文环境必须用中文明确要求。
+     * 系统提示词跟随应用语言 + 角色预设：离线小模型对英文 system prompt 有强烈的
+     * 英文回复倾向（用户真机实测），中文环境必须用中文明确要求。
      */
-    fun chatSystem(): String = if (isZhUi) {
-        "你是一个完全在设备本地运行的智能助手。回答要简洁、有帮助。" +
-            "默认使用简体中文回答；只有当用户用其他语言提问时，才用对方的语言回答。"
+    fun chatSystem(role: String = "default"): String = if (isZhUi) {
+        when (role) {
+            "translator" ->
+                "你是一位专业翻译官，完全在设备本地运行。用户发来任何文字，给出准确、地道的译文" +
+                    "（中文→英文、英文→中文自动判断），必要时补充一两条关键词或语气说明。只做翻译相关回答。"
+            "grammar" ->
+                "你是一位耐心的英语语法老师，完全在设备本地运行。用简体中文讲解：指出用户句子的语法问题、" +
+                    "给出修改后的句子、解释为什么，并举一个相似例句。鼓励为主，简明扼要。"
+            "polish" ->
+                "你是一位写作润色专家，完全在设备本地运行。把用户的文字改得更通顺、自然、有表现力，" +
+                    "保持原意和原语言，输出润色稿，并用一两句话说明主要修改点。"
+            "speaking" ->
+                "You are a friendly English speaking partner running fully on-device. " +
+                    "Chat with the user in simple, natural English. After each reply, if the user's " +
+                    "English had mistakes, gently show the corrected sentence in one line starting with \"✏️\"."
+            else ->
+                "你是一个完全在设备本地运行的智能助手。回答要简洁、有帮助。" +
+                    "默认使用简体中文回答；只有当用户用其他语言提问时，才用对方的语言回答。"
+        }
     } else {
-        "You are an intelligent assistant running fully on-device. Be concise, helpful, " +
-            "and respond in the user's language. If the user mixes languages, mirror them."
+        when (role) {
+            "translator" ->
+                "You are a professional translator running fully on-device. For any text the user sends, " +
+                    "produce an accurate, idiomatic translation (auto-detect ZH→EN / EN→ZH); optionally add " +
+                    "one or two key-word notes. Stay on translation tasks."
+            "grammar" ->
+                "You are a patient English grammar teacher running fully on-device. Point out grammar issues " +
+                    "in the user's sentence, give the corrected version, explain why, and add one similar example. " +
+                    "Be encouraging and concise."
+            "polish" ->
+                "You are a writing-polish expert running fully on-device. Rewrite the user's text to be smoother, " +
+                    "more natural and expressive, keeping the meaning and language. Output the polished version, " +
+                    "then one or two sentences on the key changes."
+            "speaking" ->
+                "You are a friendly English speaking partner running fully on-device. Chat in simple, natural " +
+                    "English. After each reply, if the user's English had mistakes, gently show the corrected " +
+                    "sentence in one line starting with \"✏️\"."
+            else ->
+                "You are an intelligent assistant running fully on-device. Be concise, helpful, " +
+                    "and respond in the user's language. If the user mixes languages, mirror them."
+        }
     }
 
     /** 历史里带图轮次的标注（让模型知道哪轮发过图）。 */
@@ -96,10 +134,10 @@ object PromptTemplates {
      * 多轮对话 prompt。history 含用户与助手双方消息，窗口大小由调用方控制
      * （ChatViewModel 负责摘要压缩 + 字数预算裁剪），这里不再二次截断。
      */
-    fun chat(history: List<Pair<String, String>>, userInput: String): String {
+    fun chat(history: List<Pair<String, String>>, userInput: String, role: String = "default"): String {
         val sb = StringBuilder()
         // Inject system prompt as the first user turn (Gemma 4 has no dedicated system role).
-        sb.append(USER_OPEN).append(chatSystem()).append(TURN_END)
+        sb.append(USER_OPEN).append(chatSystem(role)).append(TURN_END)
         sb.append(MODEL_OPEN).append("Understood.").append(TURN_END)
         for ((role, content) in history) {
             if (role == "user") {
@@ -129,9 +167,14 @@ object PromptTemplates {
      * @param refed true = 本轮没发新图，是把会话里此前发过的图重新喂入
      *              （追问场景），文案上要区分，免得模型以为又收到一张新图。
      */
-    fun chatWithImage(history: List<Pair<String, String>>, userInput: String, refed: Boolean = false): String {
+    fun chatWithImage(
+        history: List<Pair<String, String>>,
+        userInput: String,
+        refed: Boolean = false,
+        role: String = "default",
+    ): String {
         val sb = StringBuilder()
-        sb.append(USER_OPEN).append(chatSystem()).append(TURN_END)
+        sb.append(USER_OPEN).append(chatSystem(role)).append(TURN_END)
         sb.append(MODEL_OPEN).append("Understood.").append(TURN_END)
         for ((role, content) in history) {
             if (role == "user") sb.append(USER_OPEN).append(content.trim()).append(TURN_END)

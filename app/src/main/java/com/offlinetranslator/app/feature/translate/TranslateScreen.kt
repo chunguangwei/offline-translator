@@ -33,7 +33,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Button
@@ -49,7 +52,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -104,6 +109,43 @@ fun TranslateScreen(
                 PackageManager.PERMISSION_GRANTED -> vm.startVoiceInput()
             else -> micPermLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    // ── 拍照/选图翻译：识别图中文字逐行对照译出，结果流式进译文卡。 ──
+    var cameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    fun newCameraUri(): android.net.Uri {
+        val dir = java.io.File(ctx.cacheDir, "camera").apply { mkdirs() }
+        val f = java.io.File(dir, "capture_${System.currentTimeMillis()}.jpg")
+        return androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", f)
+    }
+    val galleryPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let(vm::translateImage) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { ok -> if (ok) cameraUri?.let(vm::translateImage) }
+    val cameraPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            newCameraUri().also { cameraUri = it; cameraLauncher.launch(it) }
+        }
+    }
+    fun onCameraClick() {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            newCameraUri().also { cameraUri = it; cameraLauncher.launch(it) }
+        } else {
+            cameraPermLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+    fun onGalleryClick() {
+        galleryPicker.launch(
+            androidx.activity.result.PickVisualMediaRequest(
+                ActivityResultContracts.PickVisualMedia.ImageOnly
+            )
+        )
     }
 
     // consumeWindowInsets + imePadding：键盘弹起时内容收缩上移（而非系统整窗平移
@@ -182,6 +224,8 @@ fun TranslateScreen(
                         isRecording = ui.isRecording,
                         isTranscribing = ui.isTranscribing,
                         onMic = { onMicClick() },
+                        onCamera = { onCameraClick() },
+                        onGallery = { onGalleryClick() },
                         onPaste = {
                             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             val t = cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
@@ -201,6 +245,7 @@ fun TranslateScreen(
                             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             cm.setPrimaryClip(ClipData.newPlainText("translation", ui.output))
                         },
+                        onShare = { ShareCard.share(ctx, ui.input.trim(), ui.output.trim()) },
                     )
                 }
 
@@ -291,6 +336,8 @@ private fun SourceCard(
     isRecording: Boolean,
     isTranscribing: Boolean,
     onMic: () -> Unit,
+    onCamera: () -> Unit,
+    onGallery: () -> Unit,
     onPaste: () -> Unit,
     onClear: () -> Unit,
 ) {
@@ -366,6 +413,23 @@ private fun SourceCard(
                         modifier = Modifier.padding(end = 4.dp),
                     )
                 }
+                // 拍照翻译 / 相册图翻译（识别图中文字逐行对照译出）。
+                IconButton(onClick = onCamera) {
+                    Icon(
+                        Icons.Rounded.PhotoCamera,
+                        contentDescription = stringResource(R.string.translate_camera),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                IconButton(onClick = onGallery) {
+                    Icon(
+                        Icons.Rounded.Image,
+                        contentDescription = stringResource(R.string.translate_gallery),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
                 IconButton(onClick = onMic) {
                     Icon(
                         imageVector = if (isRecording) Icons.Rounded.Stop else Icons.Rounded.Mic,
@@ -407,6 +471,7 @@ private fun TargetCard(
     isTranslating: Boolean,
     loadingModel: Boolean,
     onCopy: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Box(
         modifier = modifier
@@ -479,6 +544,15 @@ private fun TargetCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (text.isNotEmpty()) {
+                    // 品牌分享卡片（渐变卡图 → 系统分享面板）。
+                    IconButton(onClick = onShare) {
+                        Icon(
+                            Icons.Rounded.Share,
+                            contentDescription = stringResource(R.string.translate_share),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                     IconButton(onClick = onCopy) {
                         Icon(
                             Icons.Rounded.ContentCopy,

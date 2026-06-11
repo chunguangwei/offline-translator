@@ -21,4 +21,9 @@ class HistoryViewModel @Inject constructor(
 
     fun delete(id: Long) { viewModelScope.launch { dao.delete(id) } }
     fun clear() { viewModelScope.launch { dao.clearAll() } }
+
+    /** 收藏/取消收藏进生词本（单词练习的素材来源）。 */
+    fun setStarred(id: Long, starred: Boolean) {
+        viewModelScope.launch { dao.setStarred(id, starred) }
+    }
 }

@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -54,6 +55,7 @@ class ChatViewModel @Inject constructor(
     private val engine: GemmaEngine,
     private val dao: ChatDao,
     private val recorder: PcmAudioRecorder,
+    private val prefs: com.offlinetranslator.app.core.data.AppPreferencesRepository,
 ) : ViewModel() {
 
     private companion object {
@@ -83,6 +85,16 @@ class ChatViewModel @Inject constructor(
     /** 全部会话列表（倒序），供会话抽屉展示/切换/删除。 */
     val sessions = dao.observeSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<ChatSessionEntity>())
+
+    /** 当前角色预设（default/translator/grammar/polish/speaking），持久化在 DataStore。 */
+    val chatRole = prefs.flow
+        .map { it.chatRole }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "default")
+
+    fun setChatRole(role: String) {
+        viewModelScope.launch { prefs.setChatRole(role) }
+    }
+
 
     private var generateJob: Job? = null
     private var voiceJob: Job? = null
@@ -314,10 +326,11 @@ class ChatViewModel @Inject constructor(
             val sendImage = image ?: refedImage
             _ui.update { it.copy(isGenerating = true, streamingContent = "", error = null) }
 
+            val role = chatRole.value
             val prompt = when {
-                image != null -> PromptTemplates.chatWithImage(historyBefore, content)
-                refedImage != null -> PromptTemplates.chatWithImage(historyBefore, content, refed = true)
-                else -> PromptTemplates.chat(historyBefore, content)
+                image != null -> PromptTemplates.chatWithImage(historyBefore, content, role = role)
+                refedImage != null -> PromptTemplates.chatWithImage(historyBefore, content, refed = true, role = role)
+                else -> PromptTemplates.chat(historyBefore, content, role = role)
             }
             val sb = StringBuilder()
             try {

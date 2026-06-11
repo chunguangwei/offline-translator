@@ -28,11 +28,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.TheaterComedy
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -145,6 +147,39 @@ fun ChatScreen(
                 style = MaterialTheme.typography.headlineSmall,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 角色预设菜单（默认助手/翻译官/语法老师/写作润色/口语陪练）。
+                val role by vm.chatRole.collectAsStateWithLifecycle()
+                var showRoles by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { showRoles = true }) {
+                        Icon(
+                            Icons.Rounded.TheaterComedy,
+                            contentDescription = stringResource(R.string.chat_role),
+                            tint = if (role != "default") MaterialTheme.colorScheme.primary
+                            else androidx.compose.material3.LocalContentColor.current,
+                        )
+                    }
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = showRoles,
+                        onDismissRequest = { showRoles = false },
+                    ) {
+                        com.offlinetranslator.app.engine.llm.PromptTemplates.chatRoles.forEach { id ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(roleLabel(id)) },
+                                leadingIcon = {
+                                    if (id == role) Icon(
+                                        Icons.Rounded.Check, contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                onClick = {
+                                    vm.setChatRole(id)
+                                    showRoles = false
+                                },
+                            )
+                        }
+                    }
+                }
                 IconButton(onClick = { showSessions = true }) {
                     Icon(Icons.Rounded.History, contentDescription = stringResource(R.string.chat_sessions))
                 }
@@ -464,6 +499,18 @@ fun ChatScreen(
 }
 
 private val sessionTimeFmt = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+
+/** 角色 id → 展示名（string 资源，随语言切换）。 */
+@Composable
+private fun roleLabel(id: String): String = stringResource(
+    when (id) {
+        "translator" -> R.string.chat_role_translator
+        "grammar" -> R.string.chat_role_grammar
+        "polish" -> R.string.chat_role_polish
+        "speaking" -> R.string.chat_role_speaking
+        else -> R.string.chat_role_default
+    }
+)
 
 @Composable
 private fun MessageBubble(msg: ChatMessageEntity, onImageClick: (String) -> Unit = {}) {
