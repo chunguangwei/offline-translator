@@ -58,6 +58,23 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk \
              "artifacts/yiren-${GITHUB_REF_NAME}.apk"
 
+      # 发布说明从 CHANGELOG.md 提取对应版本的"人话"内容（应用内更新弹窗直接展示，
+      # 不能是 --generate-notes 那种 commit 链接堆）；没写就兜底一句话。
+      - name: Build release notes from CHANGELOG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md \
+            | sed -e '/^---$/d' -e 's/^### /◆ /' -e 's/\*\*//g' -e 's/^- /· /' \
+            | awk 'NF || p; {p=NF}' > notes.md
+          if [ ! -s notes.md ] || [ -z "$(tr -d '[:space:]' < notes.md)" ]; then
+            echo "修正一些 Bug，提升稳定性。" > notes.md
+          fi
+          echo "===== release notes ====="; cat notes.md
+
       # 用 runner 自带的 gh CLI 发布。曾用 softprops/action-gh-release@v2，
       # 2026-06 起其新版本对默认 GITHUB_TOKEN 报 401（v1.0.5 首发因此失败），
       # gh CLI 走 GH_TOKEN 稳定且少一个三方依赖。
@@ -67,5 +84,5 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --title "译人 $GITHUB_REF_NAME" \
-            --generate-notes \
+            --notes-file notes.md \
             "artifacts/yiren-${GITHUB_REF_NAME}.apk"
