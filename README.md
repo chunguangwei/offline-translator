@@ -1,8 +1,10 @@
 # 译人 · Yiren
 
-> 完全离线 / 端侧推理的 AI 助手 Android 应用 — 集合 **翻译 / AI 对话 / 语音转写 / 拍照看图 / 模型管理** 五大能力，零依赖 Google 服务（GMS-free），适配华为 / 荣耀等无 GMS 设备。
+> 完全离线 / 端侧推理的 AI 翻译与问答应用，**Android + iOS 双端功能对齐**。
+> 翻译（文字/语音）· 问答（文字/语音/图片，多轮会话）· 历史 · 设置，
+> 零依赖 Google 服务（GMS-free），适配华为 / 荣耀等无 GMS 设备。
 
-**当前版本：1.0.4**　|　最低系统：Android 8.0（API 26）　|　支持 arm64-v8a / armeabi-v7a
+**Android 1.0.8**（最低 Android 8.0 / API 26，arm64-v8a + armeabi-v7a）　|　**iOS 1.0.0**（最低 iOS 17，开发签名分发，上架准备中）
 
 ---
 
@@ -11,6 +13,7 @@
 - [✨ 功能详解](#-功能详解)
 - [🧱 技术栈](#-技术栈)
 - [🛠️ 构建与运行](#️-构建与运行)
+- [🍏 iOS 构建](#-ios-构建)
 - [📦 模型下载](#-模型下载)
 - [🔐 隐私](#-隐私)
 - [📁 工程结构](#-工程结构)
@@ -22,50 +25,37 @@
 
 ## ✨ 功能详解
 
-### 1. 中英互译（Translate）
-- 输入框 + 流式输出，仿 Google 翻译交互
-- 中文 → 英文 / 英文 → 中文双向，一键交换源/目标语言
-- 历史译文本地缓存，方便回看
-- 引擎：**Gemma 4（LiteRT-LM）** 端侧推理，完全离线
+> 双端同款底部 4-Tab：**翻译 / 问答 / 历史 / 设置**，UI 贴合品牌暖色（珊瑚 #FF6F61 / 琥珀 #FFB152 / 品红 #C2479B）。
 
-### 2. AI 对话（Chat）
-- 豆包 / ChatGPT 风格气泡 UI + "思考中"动画
-- 多轮对话、按 token 流式渲染，KV-cache 加速
-- 长按消息复制 / 重新生成
-- 内置麦克风输入：按住 → 说话 → 松开，Gemma 端到端转写后直接发送
-- 麦克风三态 UI：录音中（波形）/ 转录中（轨道动画）/ 生成中（Stop 按钮）
-- 引擎：**Gemma 4（LiteRT-LM）** 多模态，含文本 + 音频
+### 1. 翻译（Translate）
+- 中英双向流式翻译，一键交换方向，低温采样保证只输出一种目标语言
+- **语音输入**：录音 → Gemma 离线逐字转写 → 回填输入框（用户确认后再翻译）
+- 模型缺失顶部内联横幅 + 「去下载」；首载「正在加载模型」提示
+- 翻译成功自动写入历史（同句去重）
 
-### 3. 语音翻译（Voice）
-- **一个模型搞定一切**：识别 + 翻译全部走 Gemma 4 多模态音频编码器，不依赖任何第三方 ASR（Vosk 已移除）
-- 索尼 / 豆包风格**响应式波形**：
-  - 说话即跳动（包络跟随器，attack 快 / release 慢）
-  - 静音时柔和呼吸基线（正弦滚动动画），表现为"一直在听"
-  - 60Hz 逐帧重绘 + 渐变填充 + 高振幅 glow 光晕
-- 16kHz 单声道 PCM 录音 → WAV 包装 → 交给 Gemma 音频编码器
-- 停止录音后立即显示**三色轨道动画** + 阶段文案（识别中→整理中→翻译中→即将完成），防止"以为死机"
-- Gemma 流式输出：原文 / 译文双卡片同步呈现，收到第一个 token 即关闭等待动画
-- ZH→EN / EN→ZH 双向，方向 Chip 锁定在录制中不可误触
-- 无模型时展示渐变占位图 + "去下载模型"一键跳转
+### 2. 问答（Q&A）
+- 多轮会话：会话抽屉（切换 / 删除），标题自动取首问
+- **上下文压缩**：上下文 = 摘要 + 全部未压缩双方消息；超 20 条或会话满时
+  后台静默压缩成 ≤200 字摘要，保留最近 6 条原文 —— 离线小模型的长对话方案
+- **图片问答**：相册选图（系统 Picker 免权限），图随消息进气泡、可点全屏预览；
+  追问时自动"重喂"窗口内最近一张图，压缩后自然停喂
+- **语音输入**：转写回填输入框，不直接发送
+- 暂停生成保留已输出部分；回复语言跟随应用语言
 
-### 4. 图像识别（Vision）
-- 拍照 / 相册导入图片，支持多张图历史记录
-- 四类常用问法：描述 / 文字翻译 / 解题 / 识物
-- 流式输出 + 背压重试，不丢 token
-- 引擎：**Gemma 4（LiteRT-LM）** 多模态（图像 + 文本同上下文）
+### 3. 历史（History）
+- 只存翻译记录（产品决策）：语言方向 / 原文 / 译文 / 时间，复制 / 删除 / 清空
 
-### 5. 模型管理（Models）
-- 内置 Gemma 4 E2B / E4B 两档，一键下载
-- HTTP Range 断点续传 + WorkManager 后台任务，退出 App 后续传
-- 多镜像源自动切换：`hf-mirror.com`（国内）/ `huggingface.co`（备用）
-- 支持本地 `.litertlm` 文件手动导入
-- 实时显示下载进度 / 已用磁盘 / 模型状态
+### 4. 设置（Settings）
+- 主题（跟随系统 / 浅 / 深）、应用语言（中 / 英）
+- 推理后端（自动 = GPU 优先回退 CPU / 手动 GPU / CPU），显示实际协商结果；
+  视觉 / 音频编码器始终走 CPU（跨设备稳定性优先）
+- 模型管理（下载 / 启用 / 删除）+ 下载源四档（国内优先 / 官方优先 / 自定义镜像 / 仅本地）
+- 关于与许可（版本 / 版权 / 专有许可 / GitHub / 第三方致谢 / 隐私声明）
+- Android 专属：应用内检查更新（GitHub Release 自动升级）
 
-### 6. 国际化 & 设置
-- **应用语言实时切换**（中 / 英），切换后 Activity 自动重建，全 UI 立刻更新
-- 三种主题：浅色 / 深色 / 跟随系统
-- 推理后端：GPU（默认）/ CPU（兼容模式）
-- 引擎状态指示：未下载模型时显示友好提示而非红色报错
+### 5. 品牌启动页（Splash）
+- 暖色渐变 + **眨眼 logo 角色动画** + 轮换功能标语，6 秒可跳过
+- **远程换图无需发版**：改仓库 `branding/splash/splash.json` 即可（详见该目录 README）
 
 ---
 
@@ -86,6 +76,18 @@
 | Activity 基类 | `AppCompatActivity`（Hilt `@AndroidEntryPoint` 兼容） |
 | 最低版本 | Android 8.0（SDK 26），arm64-v8a / armeabi-v7a |
 | GMS 依赖 | **完全无**，可装在华为 / 荣耀等无 Google 设备 |
+
+**iOS 端**（`ios/`，与 Android 功能对齐）：
+
+| 类别 | 选型 |
+| --- | --- |
+| 语言 / UI | Swift 5.10 + SwiftUI（iOS 17+，单 target 无三方依赖） |
+| 推理引擎 | LiteRT-LM 官方 Swift 封装 + `CLiteRTLM.xcframework`（真机 arm64 + 模拟器 arm64） |
+| 多轮对话 | LiteRT-LM 原生会话 API（systemMessage + initialMessages + 多模态 Message） |
+| 持久化 | SwiftData（会话 / 消息 / 翻译历史） |
+| 音频 | AVAudioEngine 16kHz PCM16 + WAV 封装 |
+| 模型下载 | background URLSession（锁屏 / 杀进程不中断，系统 resumeData 续传） |
+| 工程 | xcodegen 声明式（`project.yml` 入库，`.xcodeproj` 随手再生） |
 
 ---
 
@@ -159,21 +161,48 @@ keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 \
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
+### 7. 发版（Android）
+
+```bash
+# CHANGELOG.md 写好新版本条目（更新弹窗会展示这段"人话"内容）→ bump 版本号 → 打 tag
+git tag v1.0.X && git push origin v1.0.X
+# GitHub Actions 自动：签名构建 → 发 Release → 写回应用内更新清单 latest.json
+```
+
+---
+
+## 🍏 iOS 构建
+
+```bash
+brew install xcodegen           # 一次性
+cd ios && xcodegen generate && open Yiren.xcodeproj
+```
+
+- Xcode 里选 Personal Team / 付费 Team → 选真机 → ⌘R（详细步骤见 `ios/需要你做的.md`）
+- 新增源文件后需重跑 `xcodegen generate`
+- **开发期模型随包**：把 `.litertlm` 丢进 `ios/BundledModels/`（gitignored）再构建，
+  装上即用免下载；正式分发不带模型，用户应用内下载
+- 上架 App Store 需付费开发者账号；LaunchScreen 静态 / 图标无 alpha / 全离线隐私标签等
+  合规项已预埋
+
 ---
 
 ## 📦 模型下载
 
-应用首次启动后进入 **模型** 标签页，选择并下载离线模型：
+首次启动按提示进入 **设置 → 模型管理**，选择并下载离线模型：
 
 | 模型 | 文件大小 | 内存峰值 | 支持能力 | 推荐设备 |
 | --- | --- | --- | --- | --- |
-| Gemma 4 · E2B IT | ~1.5 GB | ~3 GB | 文本 + 图像 + **语音** | 6 GB RAM 起 |
-| Gemma 4 · E4B IT | ~3.0 GB | ~5 GB | 文本 + 图像 + **语音** | 8 GB RAM 起 |
+| Gemma 4 · E2B IT | ~2.4 GB | ~4 GB | 文本 + 图像 + **语音** | 6 GB RAM 起（iPhone 13 实测可用） |
+| Gemma 4 · E4B IT | ~3.4 GB | ~5.5 GB | 文本 + 图像 + **语音** | 8 GB RAM 起 |
 
-> **两个模型都支持语音识别**（Gemma 4 的 LiteRT-LM 包内含音频编码器）。
-> 选 E2B 加载更快（约 10 秒），E4B 推理质量更好。
+> 两个模型都内含音频编码器（语音识别）。E2B 加载更快，E4B 质量更好。
 
-下载链接来自 **hf-mirror.com**（国内直连），备用 `huggingface.co`；应用内自动按镜像优先级切换，全程断点续传。
+下载源顺序（双端一致，设置页可改）：**ModelScope（魔搭/阿里云，国内最快）→ hf-mirror → huggingface.co 官方**，
+逐源自动兜底，全程断点续传（iOS 用系统后台会话，锁屏/杀进程不中断）。
+
+> 为什么 ModelScope 优先：hf-mirror 对 HF Xet 类型仓库只会 308 重定向回 huggingface.co，
+> 国内无加速效果；ModelScope 直连阿里云 OSS 实测快一个量级。
 
 ---
 
@@ -242,6 +271,26 @@ app/src/main/
         ├── locales_config.xml        # 支持语言清单（zh-CN / en）
         ├── backup_rules.xml
         └── data_extraction_rules.xml
+```
+
+```
+ios/                                  # iOS 端（SwiftUI，与 Android 功能对齐）
+├── project.yml                       # xcodegen 工程声明（.xcodeproj 不入库）
+├── 需要你做的.md                      # 真机/验收步骤
+├── BundledModels/                    # 开发期"模型随包"开关（gitignored，平时仅 .gitkeep）
+├── LiteRTLM/                         # 官方 LiteRT-LM Swift 封装 + CLiteRTLM.xcframework
+└── Yiren/
+    ├── App/YirenApp.swift            # 入口：启动页→主界面 + SwiftData 容器 + 后台下载挂点
+    ├── Data/Store.swift              # SwiftData：会话/消息/翻译历史
+    ├── DesignSystem/BrandTheme.swift # 品牌色 + 键盘收起扩展
+    ├── Engine/                       # GemmaService / PromptTemplates / AudioRecorder
+    ├── Features/                     # Translate / Chat / History / Settings / Models / Splash
+    └── Assets.xcassets/AppIcon       # 1024 全出血图标（无 alpha）
+
+branding/
+├── yiren-icon-master.svg / .png      # logo master（1024）
+├── splash/splash.json                # 启动页远程换图配置（改它免发版换图）
+└── update/latest.json                # 应用内更新清单（CI 发版自动写回）
 ```
 
 ---
