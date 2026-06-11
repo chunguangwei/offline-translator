@@ -37,15 +37,59 @@ class UpdateChecker @Inject constructor(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val apiUrl =
-        "https://api.github.com/repos/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}/releases/latest"
+    private val repoPath = "${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}"
+
+    /**
+     * 更新清单多源（CI 发版自动写 branding/update/latest.json）：
+     * gh-proxy(国内可达且实时) → jsDelivr(CDN，@main 约 12h 缓存) → raw 直连。
+     * api.github.com 只作最后兜底：未认证限流 60 次/小时/IP，部分网络直接 403
+     * （用户真机实测；ImagePilot 同坑）。
+     */
+    private val manifestUrls = listOf(
+        "https://gh-proxy.com/https://raw.githubusercontent.com/$repoPath/main/branding/update/latest.json",
+        "https://cdn.jsdelivr.net/gh/$repoPath@main/branding/update/latest.json",
+        "https://raw.githubusercontent.com/$repoPath/main/branding/update/latest.json",
+    )
+
+    private val apiUrl = "https://api.github.com/repos/$repoPath/releases/latest"
 
     suspend fun check(): UpdateResult = withContext(Dispatchers.IO) {
-        runCatching {
+        // 1) 静态清单多源，不挨 API 限流。
+        for (u in manifestUrls) {
+            val m = runCatching { fetchManifest(u) }.getOrNull() ?: continue
+            return@withContext if (isNewer(m.version, BuildConfig.VERSION_NAME)) {
+                UpdateResult.Available(
+                    version = m.version,
+                    notes = m.notes.trim(),
+                    apkUrl = m.apk,
+                    sizeBytes = m.size,
+                )
+            } else {
+                UpdateResult.UpToDate
+            }
+        }
+        // 2) 兜底：GitHub API（清单源全不可达才走到这）。
+        checkViaApi()
+    }
+
+    private fun fetchManifest(url: String): UpdateManifest? {
+        val req = Request.Builder().url(url).header("User-Agent", "Yiren-App").build()
+        client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            val body = resp.body?.string().orEmpty()
+            if (body.isBlank()) return null
+            return json.decodeFromString<UpdateManifest>(body)
+        }
+    }
+
+    private fun checkViaApi(): UpdateResult {
+        return runCatching {
             val req = Request.Builder()
                 .url(apiUrl)
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
+                // 部分 GitHub 边缘节点对缺显式 UA 的请求 403（ImagePilot 实测）。
+                .header("User-Agent", "Yiren-App")
                 .build()
             client.newCall(req).execute().use { resp ->
                 if (resp.code == 404) return@use UpdateResult.UpToDate // no releases yet
@@ -73,38 +117,52 @@ class UpdateChecker @Inject constructor(
     fun download(url: String): Flow<DownloadStep> = callbackFlow {
         val dir = File(context.cacheDir, "update").apply { mkdirs() }
         val file = File(dir, "yiren-update.apk")
-        if (file.exists()) file.delete()
         trySend(DownloadStep.Progress(0, 0))
 
-        val outcome = runCatching {
-            withContext(Dispatchers.IO) {
-                val req = Request.Builder().url(url).build()
-                client.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
-                    val source = resp.body?.byteStream() ?: throw IOException("空响应体")
-                    val total = resp.body?.contentLength() ?: -1L
-                    RandomAccessFile(file, "rw").use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        var downloaded = 0L
-                        while (true) {
-                            val n = source.read(buf)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                            downloaded += n
-                            trySend(DownloadStep.Progress(downloaded, total))
+        // github.com 直链在部分网络不可达 → gh-proxy 加速候选优先、直连兜底
+        // （ImagePilot 同款）。APK 升级安装受系统签名校验，代理无法篡改得逞。
+        val candidates = buildList {
+            if (url.startsWith("https://github.com/")) add("https://gh-proxy.com/$url")
+            add(url)
+        }
+
+        var lastError: Throwable? = null
+        var done = false
+        for (candidate in candidates) {
+            if (file.exists()) file.delete()
+            val outcome = runCatching {
+                withContext(Dispatchers.IO) {
+                    val req = Request.Builder().url(candidate).header("User-Agent", "Yiren-App").build()
+                    client.newCall(req).execute().use { resp ->
+                        if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
+                        val source = resp.body?.byteStream() ?: throw IOException("空响应体")
+                        val total = resp.body?.contentLength() ?: -1L
+                        RandomAccessFile(file, "rw").use { out ->
+                            val buf = ByteArray(64 * 1024)
+                            var downloaded = 0L
+                            while (true) {
+                                val n = source.read(buf)
+                                if (n < 0) break
+                                out.write(buf, 0, n)
+                                downloaded += n
+                                trySend(DownloadStep.Progress(downloaded, total))
+                            }
                         }
                     }
+                    file
                 }
-                file
             }
+            if (outcome.isSuccess) {
+                trySend(DownloadStep.Completed(file))
+                done = true
+                break
+            }
+            lastError = outcome.exceptionOrNull()
         }
-        outcome.fold(
-            onSuccess = { trySend(DownloadStep.Completed(it)) },
-            onFailure = {
-                file.delete()
-                trySend(DownloadStep.Failed(it.message ?: "下载失败"))
-            },
-        )
+        if (!done) {
+            file.delete()
+            trySend(DownloadStep.Failed(lastError?.message ?: "下载失败"))
+        }
         close()
         awaitClose { }
     }

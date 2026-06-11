@@ -25,6 +25,19 @@ data class GithubAsset(
     val size: Long = 0,
 )
 
+/**
+ * 仓库内静态更新清单 `branding/update/latest.json`（CI 每次发版自动写入）。
+ * 检查更新首选它（gh-proxy/jsDelivr/raw 多源，国内可达），api.github.com
+ * 仅作兜底——未认证限流 60 次/小时/IP + 部分网络直接 403。
+ */
+@Serializable
+data class UpdateManifest(
+    val version: String,
+    val notes: String = "",
+    val apk: String,
+    val size: Long = 0,
+)
+
 /** Result of a "check for update" round-trip. */
 sealed interface UpdateResult {
     data object UpToDate : UpdateResult
