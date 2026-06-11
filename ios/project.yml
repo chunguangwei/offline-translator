@@ -50,6 +50,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.offlinetranslator.yiren
         INFOPLIST_KEY_CFBundleDisplayName: 译人
+        # App 图标：Assets.xcassets/AppIcon（单尺寸 1024 全出血，从
+        # branding/yiren-icon-master.svg 去圆角渲染，系统自己做遮罩）。
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Yiren/Info.plist
       properties:
