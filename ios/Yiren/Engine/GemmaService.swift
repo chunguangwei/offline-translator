@@ -16,6 +16,15 @@ enum EngineFailure: Error {
     case notLoaded
 }
 
+/// 采样配置。放在类型外（非 MainActor 隔离），默认参数才能引用。
+/// - precise：翻译等确定性任务。0.7 的对话温度会让小模型译完目标语言后
+///   "刹不住车"继续滚出一串其他语言（用户真机实测），低温收敛。
+/// - chat：自由问答，保留创造性。
+enum Samplers {
+    static let precise = try? SamplerConfig(topK: 40, topP: 0.9, temperature: 0.2)
+    static let chat = try? SamplerConfig(topK: 40, topP: 0.95, temperature: 0.7)
+}
+
 /// 对 LiteRT-LM 的应用层封装 —— 对应 Android `GemmaEngine.kt`。
 /// 单实例；加载策略与 Android 一致：GPU 优先，初始化失败回退 CPU。
 /// V1 纯文本，vision/audio 编码器不启用（省内存、加载更快），后续阶段打开。
@@ -83,17 +92,11 @@ final class GemmaService: ObservableObject {
         return .failure(.initFailed(lastError))
     }
 
-    /// 翻译等确定性任务用低温采样：0.7 的对话温度会让小模型译完目标语言后
-    /// "刹不住车"继续滚出一串其他语言（用户真机实测）。
-    static let preciseSampler = try? SamplerConfig(topK: 40, topP: 0.9, temperature: 0.2)
-    /// 自由问答用的默认采样。
-    static let chatSampler = try? SamplerConfig(topK: 40, topP: 0.95, temperature: 0.7)
-
     /// 流式生成：每次新建 Conversation（多轮上下文由调用方拼进 prompt，与 Android 同策略），
     /// 文本增量经 [PromptTemplates.trimAtStop] 防御性裁剪后产出。
     func generateStream(
         prompt: String,
-        sampler: SamplerConfig? = GemmaService.chatSampler
+        sampler: SamplerConfig? = Samplers.chat
     ) async throws -> AsyncThrowingStream<String, Error> {
         guard let engine else { throw EngineFailure.notLoaded }
         let conversation = try await engine.createConversation(

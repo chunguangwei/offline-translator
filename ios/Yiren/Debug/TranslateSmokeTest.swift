@@ -24,7 +24,7 @@ func runTranslateSmokeIfRequested() {
             // 长句 + 低温采样，与真实翻译路径完全一致（复现"译出一堆语言"刹不住车问题）。
             let stream = try await gemma.generateStream(
                 prompt: PromptTemplates.translate("今天天气很好，我们下午去公园散步，顺便买点水果回来。", fromZh: true),
-                sampler: GemmaService.preciseSampler
+                sampler: Samplers.precise
             )
             var output = ""
             for try await delta in stream { output += delta }

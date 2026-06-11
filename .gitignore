@@ -67,4 +67,5 @@ Thumbs.db
 /ios/Yiren.xcodeproj/
 /ios/build/
 /ios/*.xcworkspace
-/ios/BundledModels/
+/ios/BundledModels/*
+!/ios/BundledModels/.gitkeep

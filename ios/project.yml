@@ -28,13 +28,13 @@ targets:
       - path: Yiren
       - path: LiteRTLM/swift
         group: LiteRTLM
-      # 开发期"模型随包"（ImagePilot add_bundled_model 同款思路）：
-      # 把 .litertlm 放进 ios/BundledModels/ 即随 App 安装、装上即用，
-      # 免去真机 2.6GB 应用内下载。目录不入 git；不存在时自动跳过。
+      # 开发期"模型随包"开关（ImagePilot add_bundled_model 同款思路）：
+      # 把 .litertlm 放进 ios/BundledModels/ 即随 App 安装、装上即用，免真机下载。
+      # 产品决策（2026-06-11）：正式分发不带模型，用户应用内自行下载——
+      # 所以目录平时只有 .gitkeep（模型文件被 gitignore，目录必须存在否则构建失败）。
       - path: BundledModels
         type: folder
         buildPhase: resources
-        optional: true
     # 4GB 内存设备（iPhone 13 等）加载 2.4G 模型需要提升内存上限，
     # 否则加载阶段会被 jetsam 杀掉。开发/正式签名均支持此公开 entitlement。
     entitlements:
