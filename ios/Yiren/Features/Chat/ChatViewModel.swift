@@ -15,6 +15,9 @@ final class ChatViewModel: ObservableObject {
     private static let keepRawAfterCompress = 6
 
     @Published var sessionId: String?
+    /// 当前会话消息缓存 —— 流式期间 body 每 token 重渲染，不能每次都查 SwiftData，
+    /// 只在数据真正变更（开会话/发送/落库/删除）时 reload。
+    @Published private(set) var messages: [ChatMessage] = []
     @Published var streamingContent = ""
     @Published var isGenerating = false
     @Published var isRecording = false
@@ -44,9 +47,9 @@ final class ChatViewModel: ObservableObject {
         return (try? context.fetch(d)) ?? []
     }
 
-    func currentMessages() -> [ChatMessage] {
-        guard let sid = sessionId else { return [] }
-        return messages(in: sid)
+    /// 数据变更后刷新消息缓存。
+    private func reloadMessages() {
+        messages = sessionId.map { messages(in: $0) } ?? []
     }
 
     func openSession(_ id: String) {
@@ -55,6 +58,7 @@ final class ChatViewModel: ObservableObject {
         streamingContent = ""
         errorMessage = nil
         attachedImage = nil
+        reloadMessages()
     }
 
     func startNewSession() {
@@ -76,6 +80,7 @@ final class ChatViewModel: ObservableObject {
         if sessionId == id {
             sessionId = nil
             streamingContent = ""
+            reloadMessages()
         }
     }
 
@@ -138,6 +143,7 @@ final class ChatViewModel: ObservableObject {
                                       content: content, imagePath: imagePath)
             context.insert(userMsg)
             try? context.save()
+            reloadMessages()
 
             switch await gemma.ensureLoaded() {
             case .failure(let f):
@@ -212,6 +218,7 @@ final class ChatViewModel: ObservableObject {
                     sess.modelId = gemma.activeModel?.id ?? ""
                 }
                 try? context.save()
+                reloadMessages()
                 isGenerating = false
                 streamingContent = ""
                 maybeCompress(sid)
@@ -234,6 +241,7 @@ final class ChatViewModel: ObservableObject {
             context.insert(ChatMessage(sessionId: sid, role: "assistant", content: partial))
             session(sid)?.updatedAt = .now
             try? context.save()
+            reloadMessages()
         }
         isGenerating = false
         streamingContent = ""

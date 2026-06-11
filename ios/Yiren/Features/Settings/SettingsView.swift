@@ -73,9 +73,8 @@ struct SettingsView: View {
                         Text("CPU").tag("CPU")
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: backendPref) { _, _ in
-                        gemma.invalidateForBackendChange()
-                    }
+                    // 切换在下次生成时生效（ensureLoaded 检测偏好变更后安全重载，
+                    // 经生成门串行，不会拔掉正在生成的引擎）。
                     HStack {
                         Text(zh ? "实际后端" : "Active backend")
                         Spacer()

@@ -67,8 +67,7 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    let msgs = vm.currentMessages()
-                    ForEach(msgs, id: \.persistentModelID) { msg in
+                    ForEach(vm.messages, id: \.persistentModelID) { msg in
                         MessageBubble(msg: msg) { img in previewImage = img }
                     }
                     if vm.isGenerating || !vm.streamingContent.isEmpty {
@@ -79,15 +78,13 @@ struct ChatView: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 4)
             }
-            .id(refreshTick)
             // 下滑跟手收起键盘 + 点消息区空白收起（气泡图等子视图点击不受影响）。
             .scrollDismissesKeyboard(.interactively)
             .dismissKeyboardOnTap()
             .onChange(of: vm.streamingContent) { _, _ in
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
-            .onChange(of: vm.isGenerating) { _, _ in
-                refreshTick += 1
+            .onChange(of: vm.messages.count) { _, _ in
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
             .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
@@ -150,7 +147,6 @@ struct ChatView: View {
             if vm.isGenerating {
                 Button {
                     vm.stop()
-                    refreshTick += 1
                 } label: {
                     Image(systemName: "stop.circle.fill")
                         .font(.title2)
@@ -179,7 +175,6 @@ struct ChatView: View {
                         let text = input
                         input = ""
                         vm.send(text)
-                        refreshTick += 1
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
@@ -242,6 +237,16 @@ extension UIImage: @retroactive Identifiable {
     public var id: ObjectIdentifier { ObjectIdentifier(self) }
 }
 
+/// 气泡图片解码缓存（路径 → UIImage）：流式重渲染高频，避免每帧磁盘解码。
+private let bubbleImageCache = NSCache<NSString, UIImage>()
+
+private func cachedBubbleImage(_ path: String) -> UIImage? {
+    if let hit = bubbleImageCache.object(forKey: path as NSString) { return hit }
+    guard let img = UIImage(contentsOfFile: path) else { return nil }
+    bubbleImageCache.setObject(img, forKey: path as NSString)
+    return img
+}
+
 private struct MessageBubble: View {
     let msg: ChatMessage
     let onImageTap: (UIImage) -> Void
@@ -250,7 +255,7 @@ private struct MessageBubble: View {
         HStack {
             if msg.role == "user" { Spacer(minLength: 48) }
             VStack(alignment: msg.role == "user" ? .trailing : .leading, spacing: 6) {
-                if let path = msg.imagePath, let ui = UIImage(contentsOfFile: path) {
+                if let path = msg.imagePath, let ui = cachedBubbleImage(path) {
                     Image(uiImage: ui)
                         .resizable()
                         .scaledToFit()

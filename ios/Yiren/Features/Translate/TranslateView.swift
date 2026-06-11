@@ -39,11 +39,13 @@ struct TranslateView: View {
         }
     }
 
+    private var zh: Bool { PromptTemplates.isZhUi }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("译人")
+            Text(zh ? "译人" : "Yiren")
                 .font(.largeTitle.weight(.semibold))
-            Text("离线 AI 翻译 · 数据不出手机")
+            Text(zh ? "离线 AI 翻译 · 数据不出手机" : "Offline AI translation · On-device")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -53,10 +55,10 @@ struct TranslateView: View {
     /// 模型缺失：顶部内联横幅 + 「去下载」——与 Android 一致，不用弹窗压内容。
     private var missingModelBanner: some View {
         HStack {
-            Text("还没有可用的模型")
+            Text(zh ? "还没有可用的模型" : "No model available yet")
                 .font(.subheadline)
             Spacer()
-            Button("去下载") { showModels = true }
+            Button(zh ? "去下载" : "Download") { showModels = true }
                 .font(.subheadline.weight(.semibold))
         }
         .padding(.horizontal, 14)
@@ -74,11 +76,11 @@ struct TranslateView: View {
                 // 语音输入：录音 → 离线转写回填输入框（与 Android 翻译页一致）。
                 if vm.isTranscribing {
                     ProgressView().controlSize(.small)
-                    Text("正在转写…")
+                    Text(zh ? "正在转写…" : "Transcribing…")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else if vm.isRecording {
-                    Text("正在聆听…")
+                    Text(zh ? "正在聆听…" : "Listening…")
                         .font(.caption)
                         .foregroundStyle(Color.brandPrimary)
                     Button { Task { await vm.stopVoiceAndFill() } } label: {
@@ -100,7 +102,7 @@ struct TranslateView: View {
                 .scrollContentBackground(.hidden)
                 .overlay(alignment: .topLeading) {
                     if vm.input.isEmpty {
-                        Text(vm.sourceIsZh ? "输入要翻译的中文…" : "Enter English text…")
+                        Text(vm.sourceIsZh ? (zh ? "输入要翻译的中文…" : "Enter Chinese text…") : (zh ? "输入要翻译的英文…" : "Enter English text…"))
                             .foregroundStyle(.tertiary)
                             .padding(.top, 8)
                             .allowsHitTesting(false)
@@ -134,10 +136,10 @@ struct TranslateView: View {
                 .foregroundStyle(Color.brandTertiary)
             Group {
                 if vm.loadingModel {
-                    Label("正在加载模型，请稍等…", systemImage: "hourglass")
+                    Label(zh ? "正在加载模型，请稍等…" : "Loading model, please wait…", systemImage: "hourglass")
                         .foregroundStyle(.secondary)
                 } else if vm.output.isEmpty && !vm.isTranslating {
-                    Text("译文将出现在这里")
+                    Text(zh ? "译文将出现在这里" : "Translation appears here")
                         .foregroundStyle(.tertiary)
                 } else {
                     Text(vm.output)
@@ -156,7 +158,7 @@ struct TranslateView: View {
         Button {
             if vm.isTranslating { vm.stop() } else { vm.translate() }
         } label: {
-            Text(vm.isTranslating ? "停止" : "翻译")
+            Text(vm.isTranslating ? (zh ? "停止" : "Stop") : (zh ? "翻译" : "Translate"))
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// 模型管理页 —— 列表/下载（双源兜底）/激活/删除，对应 Android ModelsScreen。
 struct ModelsView: View {
+    private var zh: Bool { PromptTemplates.isZhUi }
     // 共享单例：background session identifier 全 App 唯一，且锁屏/重启后能接回任务。
     @ObservedObject private var downloader = ModelDownloader.shared
     @State private var refreshTick = 0 // 下载完/删除后驱动行状态刷新
@@ -33,15 +34,15 @@ struct ModelsView: View {
                         )
                     }
                 } footer: {
-                    Text("模型约 2.6–3.7 GB，建议 Wi-Fi 下载。下载完成后自动启用，推理全程离线。")
+                    Text(zh ? "模型约 2.4–3.4 GB，建议 Wi-Fi 下载。下载完成后自动启用，推理全程离线。" : "Models are 2.4–3.4 GB; Wi-Fi recommended. Auto-activated after download; inference is fully offline.")
                 }
             }
             .id(refreshTick)
-            .navigationTitle("模型管理")
+            .navigationTitle(zh ? "模型管理" : "Models")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button(zh ? "完成" : "Done") { dismiss() }
                 }
             }
         }
@@ -49,6 +50,7 @@ struct ModelsView: View {
 }
 
 private struct ModelRow: View {
+    private var zh: Bool { PromptTemplates.isZhUi }
     let model: ModelInfo
     let phase: ModelDownloader.Phase
     let isDownloaded: Bool
@@ -65,7 +67,7 @@ private struct ModelRow: View {
             HStack {
                 Text(model.displayName).font(.headline)
                 if isActive {
-                    Text("使用中")
+                    Text(zh ? "使用中" : "Active")
                         .font(.caption2.weight(.semibold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -90,36 +92,36 @@ private struct ModelRow: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Button("取消", action: onCancel)
+                        Button(zh ? "取消" : "Cancel", action: onCancel)
                             .font(.caption)
                     }
                 }
                 .padding(.top, 4)
             case .failed(let message):
-                Text("下载失败：\(message)")
+                Text((zh ? "下载失败：" : "Download failed: ") + message)
                     .font(.caption)
                     .foregroundStyle(.red)
-                Button("重试", action: onDownload)
+                Button(zh ? "重试" : "Retry", action: onDownload)
                     .font(.subheadline.weight(.semibold))
             case .idle:
                 HStack(spacing: 16) {
                     if isDownloaded || isBundled {
                         if isBundled && !isDownloaded {
-                            Text("已内置 · 随包可用")
+                            Text(zh ? "已内置 · 随包可用" : "Bundled · ready")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         if !isActive {
-                            Button("启用", action: onActivate)
+                            Button(zh ? "启用" : "Activate", action: onActivate)
                                 .font(.subheadline.weight(.semibold))
                         }
                         // 只有下载副本可删；包内预置随 App 卸载走。
                         if isDownloaded {
-                            Button("删除", role: .destructive, action: onDelete)
+                            Button(zh ? "删除" : "Delete", role: .destructive, action: onDelete)
                                 .font(.subheadline)
                         }
                     } else {
-                        Button("下载", action: onDownload)
+                        Button(zh ? "下载" : "Download", action: onDownload)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Color.brandPrimary)
                     }

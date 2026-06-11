@@ -25,6 +25,30 @@ enum Samplers {
     static let chat = try? SamplerConfig(topK: 40, topP: 0.95, temperature: 0.7)
 }
 
+/// 生成/引擎生命周期串行门 —— 对应 Android 的 mutex + genMutex：
+/// LiteRT-LM 引擎单租户，并发生成会损坏 KV-cache；后台上下文压缩与用户
+/// 下一条提问可能同时发生，必须排队。
+actor GenerationGate {
+    private var busy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        if !busy {
+            busy = true
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            busy = false
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+}
+
 /// 推理后端偏好（设置页可选，对应 Android InferenceBackend）。
 enum BackendPref: String, CaseIterable {
     case auto = "AUTO"
@@ -53,21 +77,23 @@ final class GemmaService: ObservableObject {
     private var loadedBackendPref: BackendPref?
     private var currentConversation: Conversation?
     private let storage = ModelStorage.shared
+    private let gate = GenerationGate()
 
-    /// 设置页切了后端 → 下次 ensureLoaded 重载。
-    func invalidateForBackendChange() {
-        if loadedBackendPref != BackendPref.current {
-            engine = nil
-            loadedModelId = nil
-            state = .idle
-        }
+    /// 确保目标模型已加载进内存。幂等：已加载同一模型且后端偏好未变直接返回。
+    /// 经 [gate] 串行 —— 卸载/重载引擎不能与任何在途生成并发（悬空原生指针）。
+    func ensureLoaded() async -> Result<ModelInfo, EngineFailure> {
+        await gate.acquire()
+        let result = await ensureLoadedLocked()
+        await gate.release()
+        return result
     }
 
-    /// 确保目标模型已加载进内存。幂等：已加载同一模型直接返回。
-    func ensureLoaded() async -> Result<ModelInfo, EngineFailure> {
+    private func ensureLoadedLocked() async -> Result<ModelInfo, EngineFailure> {
         let info = ModelRegistry.byId(storage.activeModelId) ?? ModelRegistry.defaultModel
 
-        if engine != nil, loadedModelId == info.id {
+        // 后端偏好变更（设置页切换）也触发重载——但只会在拿到 gate 后发生，
+        // 不会拔掉正在生成的引擎。
+        if engine != nil, loadedModelId == info.id, loadedBackendPref == BackendPref.current {
             state = .ready
             activeModel = info
             return .success(info)
@@ -136,12 +162,13 @@ final class GemmaService: ObservableObject {
         prompt: String,
         sampler: SamplerConfig? = Samplers.chat
     ) async throws -> AsyncThrowingStream<String, Error> {
-        guard let engine else { throw EngineFailure.notLoaded }
-        let conversation = try await engine.createConversation(
-            with: ConversationConfig(samplerConfig: sampler)
-        )
-        currentConversation = conversation
-        return textStream(from: conversation.sendMessageStream(Message(prompt)))
+        try await gatedStream { engine in
+            try await engine.createConversation(
+                with: ConversationConfig(samplerConfig: sampler)
+            )
+        } send: { conversation in
+            conversation.sendMessageStream(Message(prompt))
+        }
     }
 
     /// 多轮问答流式生成 —— 用 LiteRT-LM 原生会话：system + 历史 initialMessages +
@@ -151,31 +178,50 @@ final class GemmaService: ObservableObject {
         user: Message,
         sampler: SamplerConfig? = Samplers.chat
     ) async throws -> AsyncThrowingStream<String, Error> {
-        guard let engine else { throw EngineFailure.notLoaded }
-        let conversation = try await engine.createConversation(
-            with: ConversationConfig(
-                systemMessage: Message(PromptTemplates.chatSystem(), role: .system),
-                initialMessages: history,
-                samplerConfig: sampler
+        try await gatedStream { engine in
+            try await engine.createConversation(
+                with: ConversationConfig(
+                    systemMessage: Message(PromptTemplates.chatSystem(), role: .system),
+                    initialMessages: history,
+                    samplerConfig: sampler
+                )
             )
-        )
-        currentConversation = conversation
-        return textStream(from: conversation.sendMessageStream(user))
+        } send: { conversation in
+            conversation.sendMessageStream(user)
+        }
     }
 
     /// 语音逐字转写（单轮，低温采样保证忠实）。
     func transcribe(wav: Data, zh: Bool) async throws -> AsyncThrowingStream<String, Error> {
-        guard let engine else { throw EngineFailure.notLoaded }
         guard audioEnabled else { throw EngineFailure.initFailed("audio encoder not enabled") }
-        let conversation = try await engine.createConversation(
-            with: ConversationConfig(samplerConfig: Samplers.precise)
-        )
-        currentConversation = conversation
-        let message = Message(contents: [
-            .audioData(wav),
-            .text(PromptTemplates.transcribeVerbatim(zh: zh)),
-        ])
-        return textStream(from: conversation.sendMessageStream(message))
+        return try await gatedStream { engine in
+            try await engine.createConversation(
+                with: ConversationConfig(samplerConfig: Samplers.precise)
+            )
+        } send: { conversation in
+            conversation.sendMessageStream(Message(contents: [
+                .audioData(wav),
+                .text(PromptTemplates.transcribeVerbatim(zh: zh)),
+            ]))
+        }
+    }
+
+    /// 取门 → 建会话 → 发消息，流终止（完成/取消/出错）时放门。
+    /// 所有生成必经此处，确保与引擎重载互斥（Android genMutex 同款语义）。
+    private func gatedStream(
+        makeConversation: (Engine) async throws -> Conversation,
+        send: (Conversation) -> AsyncThrowingStream<Message, Error>
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        await gate.acquire()
+        do {
+            guard let engine else { throw EngineFailure.notLoaded }
+            let conversation = try await makeConversation(engine)
+            currentConversation = conversation
+            return textStream(from: send(conversation))
+        } catch {
+            await gate.release()
+            throw error
+        }
     }
 
     /// 把引擎的 Message 流转成干净的文本增量流：
@@ -183,7 +229,8 @@ final class GemmaService: ObservableObject {
     private func textStream(
         from inner: AsyncThrowingStream<Message, Error>
     ) -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream<String, Error> { continuation in
+        let gate = self.gate
+        return AsyncThrowingStream<String, Error> { continuation in
             let task = Task {
                 // 兼容增量/累计两种流式约定（Android 端踩过的坑）：
                 // 新块若以已发文本为前缀则视为累计，只发 delta。
@@ -217,6 +264,8 @@ final class GemmaService: ObservableObject {
             }
             continuation.onTermination = { _ in
                 task.cancel()
+                // 流终止（完成/取消/出错）→ 放生成门。onTermination 恰好触发一次。
+                Task { await gate.release() }
             }
         }
     }
