@@ -17,6 +17,7 @@ struct ModelsView: View {
                             model: model,
                             phase: downloader.phase(for: model),
                             isDownloaded: storage.isDownloaded(model),
+                            isBundled: storage.isBundled(model),
                             isActive: storage.activeModelId == model.id,
                             onDownload: { downloader.download(model) },
                             onCancel: { downloader.cancel(model) },
@@ -50,6 +51,8 @@ private struct ModelRow: View {
     let model: ModelInfo
     let phase: ModelDownloader.Phase
     let isDownloaded: Bool
+    /// App 包内预置（开发期模型随包），无需下载、不可删除。
+    let isBundled: Bool
     let isActive: Bool
     let onDownload: () -> Void
     let onCancel: () -> Void
@@ -99,13 +102,21 @@ private struct ModelRow: View {
                     .font(.subheadline.weight(.semibold))
             case .idle:
                 HStack(spacing: 16) {
-                    if isDownloaded {
+                    if isDownloaded || isBundled {
+                        if isBundled && !isDownloaded {
+                            Text("已内置 · 随包可用")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         if !isActive {
                             Button("启用", action: onActivate)
                                 .font(.subheadline.weight(.semibold))
                         }
-                        Button("删除", role: .destructive, action: onDelete)
-                            .font(.subheadline)
+                        // 只有下载副本可删；包内预置随 App 卸载走。
+                        if isDownloaded {
+                            Button("删除", role: .destructive, action: onDelete)
+                                .font(.subheadline)
+                        }
                     } else {
                         Button("下载", action: onDownload)
                             .font(.subheadline.weight(.semibold))

@@ -41,8 +41,8 @@ final class GemmaService: ObservableObject {
             return .success(info)
         }
 
-        let file = storage.fileURL(for: info)
-        guard FileManager.default.fileExists(atPath: file.path) else {
+        // 可用模型 = 用户下载的副本 || App 包内预置（开发期模型随包）。
+        guard let file = storage.availableURL(for: info) else {
             state = .modelMissing
             activeModel = info
             return .failure(.modelMissing)
@@ -63,7 +63,10 @@ final class GemmaService: ObservableObject {
                     backend: backend,
                     visionBackend: nil,
                     audioBackend: nil,
-                    maxNumTokens: info.maxTokens
+                    maxNumTokens: info.maxTokens,
+                    // 缓存必须落可写目录：模型可能在只读的 App 包内（随包预置），
+                    // 默认"模型同目录"会写失败。
+                    cacheDir: storage.modelsDir.path
                 )
                 let candidate = Engine(engineConfig: config)
                 try await candidate.initialize()
