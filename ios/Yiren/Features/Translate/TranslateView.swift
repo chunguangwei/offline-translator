@@ -29,6 +29,8 @@ struct TranslateView: View {
                 .padding(20)
             }
             .scrollDismissesKeyboard(.interactively)
+            // 点输入框外的空白处收起键盘（卡片/按钮自身交互不受影响）。
+            .dismissKeyboardOnTap()
             .background(Color(.systemGroupedBackground))
             .onAppear { vm.refreshModel() }
             .sheet(isPresented: $showModels, onDismiss: { vm.refreshModel() }) {

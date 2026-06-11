@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 品牌暖色 —— 与 Android `core/designsystem/theme/Color.kt` 及 logo 渐变一致。
 extension Color {
@@ -26,3 +27,14 @@ let brandGradient = LinearGradient(
     startPoint: .topLeading,
     endPoint: .bottomTrailing
 )
+
+extension View {
+    /// 点空白处收起键盘（iOS 标准交互；子视图自己的点击手势优先不受影响）。
+    func dismissKeyboardOnTap() -> some View {
+        onTapGesture {
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+            )
+        }
+    }
+}

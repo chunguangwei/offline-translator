@@ -80,6 +80,9 @@ struct ChatView: View {
                 .padding(.top, 4)
             }
             .id(refreshTick)
+            // 下滑跟手收起键盘 + 点消息区空白收起（气泡图等子视图点击不受影响）。
+            .scrollDismissesKeyboard(.interactively)
+            .dismissKeyboardOnTap()
             .onChange(of: vm.streamingContent) { _, _ in
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
