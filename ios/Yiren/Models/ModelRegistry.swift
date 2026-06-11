@@ -10,6 +10,9 @@ struct ModelInfo: Identifiable, Equatable {
     let maxTokens: Int
     let urlHf: URL
     let urlMirror: URL
+    /// ModelScope（魔搭/阿里云 OSS）直链 —— 国内最快源（ImagePilot 实测）。
+    /// hf-mirror 对 HF Xet 仓库只 308 跳回被墙的 huggingface.co，没有加速效果。
+    let urlModelScope: URL
     let fileName: String
     let summary: String
 }
@@ -25,6 +28,7 @@ enum ModelRegistry {
         maxTokens: 4096,
         urlHf: URL(string: "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm")!,
         urlMirror: URL(string: "https://hf-mirror.com/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm")!,
+        urlModelScope: URL(string: "https://modelscope.cn/models/litert-community/gemma-4-E2B-it-litert-lm/resolve/master/gemma-4-E2B-it.litertlm")!,
         fileName: "gemma-4-E2B-it.litertlm",
         summary: "免 token · 文本＋图像＋语音 · 推荐默认"
     )
@@ -39,6 +43,7 @@ enum ModelRegistry {
         maxTokens: 4096,
         urlHf: URL(string: "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm")!,
         urlMirror: URL(string: "https://hf-mirror.com/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm")!,
+        urlModelScope: URL(string: "https://modelscope.cn/models/litert-community/gemma-4-E4B-it-litert-lm/resolve/master/gemma-4-E4B-it.litertlm")!,
         fileName: "gemma-4-E4B-it.litertlm",
         summary: "免 token · 大尺寸 · 文本＋图像＋语音"
     )

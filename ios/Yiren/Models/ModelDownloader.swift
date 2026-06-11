@@ -41,8 +41,9 @@ final class ModelDownloader: NSObject, ObservableObject {
     }
 
     private func run(_ model: ModelInfo) async {
-        // 国内镜像优先，官方兜底 —— 与 Android 默认源一致。
-        let sources = [model.urlMirror, model.urlHf]
+        // ModelScope(阿里云 OSS，国内最快) → hf-mirror → 官方，与 Android 一致。
+        // hf-mirror 对 HF Xet 仓库只 308 跳回被墙的 huggingface.co（"下载太慢"根因）。
+        let sources = [model.urlModelScope, model.urlMirror, model.urlHf]
         var lastError = "下载失败"
         for url in sources {
             do {
@@ -63,21 +64,42 @@ final class ModelDownloader: NSObject, ObservableObject {
     private func fetch(_ model: ModelInfo, from url: URL) async throws {
         let dest = storage.fileURL(for: model)
         let tmp = dest.appendingPathExtension("part")
-        try? FileManager.default.removeItem(at: tmp)
 
-        let (bytes, response) = try await URLSession.shared.bytes(from: url)
+        // 断点续传：.part 已有内容就带 Range 续传（2.5GB 下载中断重来太痛）。
+        var existing: Int64 = 0
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: tmp.path),
+           let size = attrs[.size] as? Int64, size > 0 {
+            existing = size
+        }
+        var request = URLRequest(url: url)
+        if existing > 0 {
+            request.setValue("bytes=\(existing)-", forHTTPHeaderField: "Range")
+        }
+
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
         }
-        let total = http.expectedContentLength > 0 ? http.expectedContentLength : model.sizeBytes
+        // 服务端不支持 Range（200 而非 206）→ 从头来。
+        let resumed = http.statusCode == 206 && existing > 0
+        if !resumed {
+            try? FileManager.default.removeItem(at: tmp)
+            existing = 0
+        }
+        let total = http.expectedContentLength > 0
+            ? http.expectedContentLength + (resumed ? existing : 0)
+            : model.sizeBytes
 
-        FileManager.default.createFile(atPath: tmp.path, contents: nil)
+        if !FileManager.default.fileExists(atPath: tmp.path) {
+            FileManager.default.createFile(atPath: tmp.path, contents: nil)
+        }
         let handle = try FileHandle(forWritingTo: tmp)
         defer { try? handle.close() }
+        try handle.seekToEnd()
 
         var buffer = Data()
         buffer.reserveCapacity(1 << 20)
-        var downloaded: Int64 = 0
+        var downloaded: Int64 = existing
         var lastReport = Date.distantPast
 
         for try await byte in bytes {

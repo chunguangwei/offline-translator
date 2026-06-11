@@ -87,11 +87,13 @@ class ModelDownloader @Inject constructor(
         src: ModelSource,
         customBase: String,
     ): List<String> = when (src) {
-        // 国内/国外互为兜底：首选源失败时自动顺延到另一个（download() 的 for 循环逐个重试）。
-        //  HF_DIRECT  → 国外(huggingface.co) 优先，国内(hf-mirror) 兜底
-        //  HF_MIRROR  → 国内(hf-mirror) 优先，国外(huggingface.co) 兜底
-        ModelSource.HF_DIRECT -> listOf(info.urlHf, info.urlMirror).distinct()
-        ModelSource.HF_MIRROR -> listOf(info.urlMirror, info.urlHf).distinct()
+        // 多源互为兜底：首选源失败时自动顺延（download() 的 for 循环逐个重试）。
+        //  HF_MIRROR(默认"国内优先") → ModelScope(阿里云 OSS，国内最快) → hf-mirror → 官方
+        //  HF_DIRECT → 官方 → ModelScope → hf-mirror
+        // 注：hf-mirror 对 HF Xet 仓库只 308 跳回被墙的 huggingface.co（无加速效果，
+        // 用户实测"下载太慢"的根因）；ModelScope 直连阿里云 CDN，ImagePilot 实测快。
+        ModelSource.HF_DIRECT -> listOf(info.urlHf, info.urlModelScope, info.urlMirror).distinct()
+        ModelSource.HF_MIRROR -> listOf(info.urlModelScope, info.urlMirror, info.urlHf).distinct()
         // CUSTOM uses ONLY the user-supplied base URL — no silent fallback.
         ModelSource.CUSTOM -> {
             val base = customBase.trim()
