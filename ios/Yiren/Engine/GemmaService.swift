@@ -83,11 +83,19 @@ final class GemmaService: ObservableObject {
         return .failure(.initFailed(lastError))
     }
 
+    /// 翻译等确定性任务用低温采样：0.7 的对话温度会让小模型译完目标语言后
+    /// "刹不住车"继续滚出一串其他语言（用户真机实测）。
+    static let preciseSampler = try? SamplerConfig(topK: 40, topP: 0.9, temperature: 0.2)
+    /// 自由问答用的默认采样。
+    static let chatSampler = try? SamplerConfig(topK: 40, topP: 0.95, temperature: 0.7)
+
     /// 流式生成：每次新建 Conversation（多轮上下文由调用方拼进 prompt，与 Android 同策略），
     /// 文本增量经 [PromptTemplates.trimAtStop] 防御性裁剪后产出。
-    func generateStream(prompt: String) async throws -> AsyncThrowingStream<String, Error> {
+    func generateStream(
+        prompt: String,
+        sampler: SamplerConfig? = GemmaService.chatSampler
+    ) async throws -> AsyncThrowingStream<String, Error> {
         guard let engine else { throw EngineFailure.notLoaded }
-        let sampler = try? SamplerConfig(topK: 40, topP: 0.95, temperature: 0.7)
         let conversation = try await engine.createConversation(
             with: ConversationConfig(samplerConfig: sampler)
         )

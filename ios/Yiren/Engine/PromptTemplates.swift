@@ -23,10 +23,12 @@ enum PromptTemplates {
     static func translate(_ text: String, fromZh: Bool) -> String {
         if fromZh {
             return "You are a precise translator. Translate the following Chinese text to natural, idiomatic English. "
-                + "Output ONLY the translation — no quotes, no explanation, no extra text.\n\nChinese: \(text)"
+                + "Output ONLY the English translation — exactly ONE translation, in English ONLY. "
+                + "Do NOT translate into any other language. No quotes, no explanation, no extra text.\n\nChinese: \(text)"
         } else {
-            return "你是一个精准的翻译。把下面的英文翻译成自然、地道的中文。"
-                + "只输出译文，不要加引号、不要解释、不要任何多余内容。\n\nEnglish: \(text)"
+            return "你是一个精准的翻译。把下面的英文翻译成自然、地道的简体中文。"
+                + "只输出唯一一份中文译文——不要翻译成任何其他语言、不要给多个版本、"
+                + "不要加引号、不要解释、不要任何多余内容。\n\nEnglish: \(text)"
         }
     }
 }

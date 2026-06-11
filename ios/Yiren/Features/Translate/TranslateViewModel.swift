@@ -60,7 +60,8 @@ final class TranslateViewModel: ObservableObject {
 
             do {
                 let stream = try await gemma.generateStream(
-                    prompt: PromptTemplates.translate(text, fromZh: fromZh)
+                    prompt: PromptTemplates.translate(text, fromZh: fromZh),
+                    sampler: GemmaService.preciseSampler
                 )
                 for try await delta in stream {
                     if Task.isCancelled { break }
