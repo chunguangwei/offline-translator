@@ -40,7 +40,12 @@ struct ChatView: View {
                     Menu {
                         ForEach(PromptTemplates.chatRoles, id: \.self) { id in
                             Button {
-                                chatRole = id
+                                // 切角色 = 换人设：有历史就自动开新会话，避免旧角色语气带偏；
+                                // 空会话原地生效。
+                                if chatRole != id {
+                                    chatRole = id
+                                    if !vm.messages.isEmpty { vm.startNewSession() }
+                                }
                             } label: {
                                 if id == chatRole {
                                     Label(PromptTemplates.roleLabel(id), systemImage: "checkmark")

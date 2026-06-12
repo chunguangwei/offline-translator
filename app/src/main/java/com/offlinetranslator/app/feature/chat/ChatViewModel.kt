@@ -81,7 +81,15 @@ class ChatViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "default")
 
     fun setChatRole(role: String) {
-        viewModelScope.launch { prefs.setChatRole(role) }
+        viewModelScope.launch {
+            val changed = role != chatRole.value
+            prefs.setChatRole(role)
+            // 切角色 = 换人设：老会话历史带着旧角色语气会把小模型带偏，
+            // 自动开新会话让新角色纯净生效；当前会话还是空的就原地复用。
+            if (changed && messages.value.isNotEmpty()) {
+                startNewSession()
+            }
+        }
     }
 
 
