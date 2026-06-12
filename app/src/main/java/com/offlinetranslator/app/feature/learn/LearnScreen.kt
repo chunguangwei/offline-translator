@@ -134,8 +134,16 @@ private fun StarredPracticeDialog(items: List<TranslationEntity>, onDismiss: () 
     val total = items.size
 
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 if (queue.isEmpty()) {
                     Text("🎉", style = MaterialTheme.typography.displaySmall)
                     Spacer(Modifier.height(8.dp))

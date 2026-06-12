@@ -181,8 +181,14 @@ private fun ImportDialog(vm: WordBookViewModel, onDismiss: () -> Unit) {
     }
 
     Dialog(onDismissRequest = { if (!ui.isExtracting) onDismiss() }) {
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Column {
+        // 实底卡片：弹窗不透底（玻璃拟态在 Dialog 里会透出下层内容，观感差）。
+        androidx.compose.material3.Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Text(
                     stringResource(R.string.wb_new),
                     style = MaterialTheme.typography.titleMedium,
@@ -397,8 +403,16 @@ private fun QuizDialog(
     val total = batch.size
 
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 if (queue.isEmpty()) {
                     Text("🎉", style = MaterialTheme.typography.displaySmall)
                     Spacer(Modifier.height(8.dp))
