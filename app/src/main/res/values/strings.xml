@@ -51,6 +51,7 @@
     <string name="translate_need_model">需要先下载离线模型才能翻译</string>
     <string name="translate_go_download">去下载</string>
     <string name="nav_history">历史</string>
+    <string name="nav_learn">学习</string>
     <string name="nav_qa">问答</string>
     <string name="placeholder_coming_soon">功能开发中，敬请期待</string>
     <string name="history_title">历史</string>

@@ -10,6 +10,8 @@ struct RootTabView: View {
                 .tabItem { Label(zh ? "翻译" : "Translate", systemImage: "character.bubble") }
             ChatView()
                 .tabItem { Label(zh ? "问答" : "Q&A", systemImage: "bubble.left.and.bubble.right") }
+            LearnView()
+                .tabItem { Label(zh ? "学习" : "Learn", systemImage: "graduationcap") }
             HistoryView()
                 .tabItem { Label(zh ? "历史" : "History", systemImage: "clock") }
             SettingsView()

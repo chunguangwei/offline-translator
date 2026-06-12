@@ -89,6 +89,9 @@ fun AppShell() {
                 )
             }
             composable(Route.Chat.path) { ChatScreen(padding = innerPadding) }
+            composable(Route.Learn.path) {
+                com.offlinetranslator.app.feature.learn.LearnScreen(padding = innerPadding)
+            }
             composable(Route.History.path) { HistoryScreen(padding = innerPadding) }
             composable(Route.Settings.path) {
                 SettingsScreen(

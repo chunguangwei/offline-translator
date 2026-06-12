@@ -15,14 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,9 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,18 +43,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * 历史 Tab —— 纯翻译记录（学习入口已独立成「学习」Tab）。
+ * 星标 = 收藏进生词本（练习去「学习」页）。
+ */
 @Composable
 fun HistoryScreen(
     padding: PaddingValues,
     vm: HistoryViewModel = hiltViewModel(),
 ) {
-    val all by vm.items.collectAsStateWithLifecycle()
+    val items by vm.items.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
-    // 记录 / 生词本 / 单词本 三段；生词本可抽卡练习，单词本是独立体系（上传+测试）。
-    var tab by remember { mutableStateOf(0) }
-    val starredOnly = tab == 1
-    var showPractice by remember { mutableStateOf(false) }
-    val items = if (starredOnly) all.filter { it.starred } else all
 
     Column(
         modifier = Modifier
@@ -77,46 +70,17 @@ fun HistoryScreen(
                 text = stringResource(R.string.history_title),
                 style = MaterialTheme.typography.headlineSmall,
             )
-            if (all.isNotEmpty() && tab == 0) {
+            if (items.isNotEmpty()) {
                 TextButton(onClick = vm::clear) {
                     Text(stringResource(R.string.history_clear), color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = tab == 0,
-                onClick = { tab = 0 },
-                label = { Text(stringResource(R.string.history_filter_all)) },
-            )
-            FilterChip(
-                selected = tab == 1,
-                onClick = { tab = 1 },
-                label = { Text(stringResource(R.string.history_filter_starred)) },
-            )
-            FilterChip(
-                selected = tab == 2,
-                onClick = { tab = 2 },
-                label = { Text(stringResource(R.string.wb_tab)) },
-            )
-            Spacer(Modifier.weight(1f))
-            if (starredOnly && items.isNotEmpty()) {
-                TextButton(onClick = { showPractice = true }) {
-                    Text(stringResource(R.string.practice_start), color = MaterialTheme.colorScheme.primary)
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-
-        if (tab == 2) {
-            com.offlinetranslator.app.feature.wordbook.WordBooksSection()
-        } else if (items.isEmpty()) {
+        if (items.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = stringResource(
-                        if (starredOnly) R.string.history_starred_empty else R.string.history_empty
-                    ),
+                    text = stringResource(R.string.history_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -136,99 +100,6 @@ fun HistoryScreen(
                         onDelete = { vm.delete(item.id) },
                         onStar = { vm.setStarred(item.id, !item.starred) },
                     )
-                }
-            }
-        }
-    }
-
-    if (showPractice) {
-        PracticeDialog(
-            items = all.filter { it.starred },
-            onDismiss = { showPractice = false },
-        )
-    }
-}
-
-/**
- * 抽卡练习：正面原文 → 点击翻面看译文 → 「认识」移出本轮 /「再练」放回队尾。
- * 会话内循环，不持久化熟练度（离线轻量版）。
- */
-@Composable
-private fun PracticeDialog(items: List<TranslationEntity>, onDismiss: () -> Unit) {
-    val queue = remember { androidx.compose.runtime.mutableStateListOf(*items.shuffled().toTypedArray()) }
-    var revealed by remember { mutableStateOf(false) }
-    val total = items.size
-
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (queue.isEmpty()) {
-                    Text("🎉", style = MaterialTheme.typography.displaySmall)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        stringResource(R.string.practice_done),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.practice_close)) }
-                } else {
-                    val card = queue.first()
-                    Text(
-                        text = stringResource(R.string.practice_progress, total - queue.size + 1, total),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 120.dp)
-                            .clickable { revealed = !revealed },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = card.sourceText,
-                                style = MaterialTheme.typography.headlineSmall,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            )
-                            if (revealed) {
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    text = card.translatedText,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                )
-                            } else {
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    text = stringResource(R.string.practice_tap_reveal),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextButton(onClick = {
-                            // 再练：放回队尾
-                            val c = queue.removeAt(0)
-                            queue.add(c)
-                            revealed = false
-                        }) { Text(stringResource(R.string.practice_again)) }
-                        TextButton(onClick = {
-                            queue.removeAt(0)
-                            revealed = false
-                        }) {
-                            Text(
-                                stringResource(R.string.practice_know),
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -280,7 +151,7 @@ private fun HistoryCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 收藏进生词本（练习素材）。
+                // 收藏进生词本（练习入口在「学习」Tab）。
                 IconButton(onClick = onStar) {
                     Icon(
                         if (item.starred) Icons.Rounded.Star else Icons.Rounded.StarBorder,

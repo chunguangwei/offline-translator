@@ -1,0 +1,205 @@
+package com.offlinetranslator.app.feature.learn
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.offlinetranslator.app.R
+import com.offlinetranslator.app.core.data.db.TranslationEntity
+import com.offlinetranslator.app.core.designsystem.components.GlassCard
+import com.offlinetranslator.app.feature.history.HistoryViewModel
+import com.offlinetranslator.app.feature.wordbook.WordBooksSection
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.window.Dialog
+
+/**
+ * 学习 Tab：生词本（翻译记录收藏的词，抽卡练习）+ 单词本（上传建库+测试）。
+ * 收藏动作在「历史」页（来源处），学习入口统一在这里。
+ */
+@Composable
+fun LearnScreen(
+    padding: PaddingValues,
+    historyVm: HistoryViewModel = hiltViewModel(),
+) {
+    val all by historyVm.items.collectAsStateWithLifecycle()
+    val starred = all.filter { it.starred }
+    var tab by remember { mutableStateOf(0) }
+    var showPractice by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .padding(16.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.nav_learn),
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(tab == 0, { tab = 0 }, label = { Text(stringResource(R.string.history_filter_starred)) })
+            FilterChip(tab == 1, { tab = 1 }, label = { Text(stringResource(R.string.wb_tab)) })
+            Spacer(Modifier.weight(1f))
+            if (tab == 0 && starred.isNotEmpty()) {
+                TextButton(onClick = { showPractice = true }) {
+                    Text(stringResource(R.string.practice_start), color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        if (tab == 1) {
+            WordBooksSection()
+        } else if (starred.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = stringResource(R.string.history_starred_empty),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(starred, key = { it.id }) { item ->
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.sourceText, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    item.translatedText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            // 取消收藏（移出生词本）。
+                            IconButton(onClick = { historyVm.setStarred(item.id, false) }) {
+                                Icon(
+                                    Icons.Rounded.Star,
+                                    contentDescription = stringResource(R.string.history_star),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showPractice) {
+        StarredPracticeDialog(items = starred, onDismiss = { showPractice = false })
+    }
+}
+
+/**
+ * 生词本抽卡练习（自 HistoryScreen 迁来）：正面原文 → 翻面译文 → 认识移出/再练放回队尾。
+ */
+@Composable
+private fun StarredPracticeDialog(items: List<TranslationEntity>, onDismiss: () -> Unit) {
+    val queue = remember { mutableStateListOf(*items.shuffled().toTypedArray()) }
+    var revealed by remember { mutableStateOf(false) }
+    val total = items.size
+
+    Dialog(onDismissRequest = onDismiss) {
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (queue.isEmpty()) {
+                    Text("🎉", style = MaterialTheme.typography.displaySmall)
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(R.string.practice_done), style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(16.dp))
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.practice_close)) }
+                } else {
+                    val card = queue.first()
+                    Text(
+                        text = stringResource(R.string.practice_progress, total - queue.size + 1, total),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp)
+                            .clickable { revealed = !revealed },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = card.sourceText,
+                                style = MaterialTheme.typography.headlineSmall,
+                                textAlign = TextAlign.Center,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            if (revealed) {
+                                Text(
+                                    text = card.translatedText,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textAlign = TextAlign.Center,
+                                )
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.practice_tap_reveal),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        TextButton(onClick = {
+                            val c = queue.removeAt(0)
+                            queue.add(c)
+                            revealed = false
+                        }) { Text(stringResource(R.string.practice_again)) }
+                        TextButton(onClick = {
+                            queue.removeAt(0)
+                            revealed = false
+                        }) {
+                            Text(
+                                stringResource(R.string.practice_know),
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

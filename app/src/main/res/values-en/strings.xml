@@ -47,6 +47,7 @@
     <string name="translate_need_model">Download the offline model first to translate</string>
     <string name="translate_go_download">Download</string>
     <string name="nav_history">History</string>
+    <string name="nav_learn">Learn</string>
     <string name="nav_qa">Q&amp;A</string>
     <string name="placeholder_coming_soon">Coming soon</string>
     <string name="history_title">History</string>

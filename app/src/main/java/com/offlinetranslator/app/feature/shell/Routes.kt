@@ -5,6 +5,7 @@ import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Widgets
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Widgets
@@ -25,6 +27,7 @@ sealed class Route(val path: String) {
     data object Voice : Route("voice")
     data object Vision : Route("vision")
     data object Models : Route("models")
+    data object Learn : Route("learn")
     data object History : Route("history")
     data object Settings : Route("settings")
 }
@@ -39,6 +42,7 @@ data class TopLevelDestination(
 val topLevelDestinations = listOf(
     TopLevelDestination(Route.Translate, R.string.nav_translate, Icons.Rounded.SwapHoriz, Icons.Outlined.SwapHoriz),
     TopLevelDestination(Route.Chat, R.string.nav_qa, Icons.Rounded.Forum, Icons.Outlined.Forum),
+    TopLevelDestination(Route.Learn, R.string.nav_learn, Icons.Rounded.School, Icons.Outlined.School),
     TopLevelDestination(Route.History, R.string.nav_history, Icons.Rounded.History, Icons.Outlined.History),
     TopLevelDestination(Route.Settings, R.string.nav_settings, Icons.Rounded.Settings, Icons.Outlined.Settings),
 )
