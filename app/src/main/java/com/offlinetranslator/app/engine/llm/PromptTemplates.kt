@@ -209,6 +209,19 @@ object PromptTemplates {
         return sb.toString()
     }
 
+    /**
+     * 单词本导入：从用户上传的文本块提取英文词条+中文释义。
+     * 输出严格行格式 `english => 中文释义 => 注释`（注释可空）；
+     * 纯英文词表（没有中文释义）也要由模型补出释义。
+     */
+    fun extractVocab(chunk: String): String {
+        val body = "从下面的文本中提取所有英文单词或短语，并给出对应的简体中文释义。" +
+            "如果文本里已有释义就使用它；没有就由你翻译补出。每行严格输出一条，" +
+            "格式为「英文 => 中文释义 => 简短注释」，注释可以是词性、例句或用法说明，" +
+            "没有就留空。不要输出编号、标题或任何其他内容。\n\n文本：\n$chunk"
+        return wrap(body)
+    }
+
     fun visionDescribe(userPrompt: String): String {
         val q = userPrompt.ifBlank { "Please describe what you see in detail." }
         val body = "You can see the attached image. Answer the user's question accurately, " +

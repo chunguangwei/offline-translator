@@ -7,6 +7,7 @@ import com.offlinetranslator.app.core.data.db.ChatDao
 import com.offlinetranslator.app.core.data.db.MIGRATION_1_2
 import com.offlinetranslator.app.core.data.db.MIGRATION_2_3
 import com.offlinetranslator.app.core.data.db.MIGRATION_3_4
+import com.offlinetranslator.app.core.data.db.MIGRATION_4_5
 import com.offlinetranslator.app.core.data.db.TranslationDao
 import dagger.Module
 import dagger.Provides
@@ -25,7 +26,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "offline_translator.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -34,6 +35,9 @@ object AppModule {
 
     @Provides
     fun provideTranslationDao(db: AppDatabase): TranslationDao = db.translationDao()
+
+    @Provides
+    fun provideWordBookDao(db: AppDatabase): com.offlinetranslator.app.core.data.db.WordBookDao = db.wordBookDao()
 
     @Provides
     @Singleton

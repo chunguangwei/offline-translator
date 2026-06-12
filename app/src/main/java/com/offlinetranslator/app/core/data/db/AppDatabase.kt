@@ -141,12 +141,99 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+// ───────────────────────── 单词本（用户上传文本 → AI 提取） ─────────────────────────
+
+@Entity(tableName = "word_book")
+data class WordBookEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    /** 用途说明（可选，如"考研核心词"）。 */
+    val purpose: String = "",
+    /** 每日学习量（5/10/20/30）。 */
+    val dailyGoal: Int = 10,
+    val createdAt: Long,
+)
+
+@Entity(tableName = "word_entry")
+data class WordEntryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val bookId: Long,
+    val english: String,
+    val chinese: String,
+    /** 注释：词性/例句/用法，可空。 */
+    val note: String = "",
+    /** 熟练度 0..3：测试「认识」+1、「不认识」归 0；≥3 视为已掌握。 */
+    val proficiency: Int = 0,
+    val lastSeenAt: Long = 0,
+    val createdAt: Long,
+)
+
+@Dao
+interface WordBookDao {
+    @Query("SELECT * FROM word_book ORDER BY createdAt DESC")
+    fun observeBooks(): Flow<List<WordBookEntity>>
+
+    @Insert
+    suspend fun insertBook(book: WordBookEntity): Long
+
+    @Query("DELETE FROM word_book WHERE id = :id")
+    suspend fun deleteBook(id: Long)
+
+    @Query("SELECT * FROM word_entry WHERE bookId = :bookId ORDER BY createdAt ASC")
+    fun observeEntries(bookId: Long): Flow<List<WordEntryEntity>>
+
+    @Query("SELECT * FROM word_entry WHERE bookId = :bookId")
+    suspend fun entriesOnce(bookId: Long): List<WordEntryEntity>
+
+    @Insert
+    suspend fun insertEntries(entries: List<WordEntryEntity>)
+
+    @Query("DELETE FROM word_entry WHERE bookId = :bookId")
+    suspend fun deleteEntries(bookId: Long)
+
+    @Query("DELETE FROM word_entry WHERE id = :id")
+    suspend fun deleteEntry(id: Long)
+
+    /** 测试自评后更新熟练度。 */
+    @Query("UPDATE word_entry SET proficiency = :proficiency, lastSeenAt = :seenAt WHERE id = :id")
+    suspend fun updateProficiency(id: Long, proficiency: Int, seenAt: Long)
+
+    @Query("SELECT COUNT(*) FROM word_entry WHERE bookId = :bookId")
+    suspend fun countEntries(bookId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM word_entry WHERE bookId = :bookId AND proficiency >= 3")
+    suspend fun countMastered(bookId: Long): Int
+}
+
+/** v4→v5：新增单词本两表。 */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS word_book (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "name TEXT NOT NULL, purpose TEXT NOT NULL, " +
+                "dailyGoal INTEGER NOT NULL, createdAt INTEGER NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS word_entry (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "bookId INTEGER NOT NULL, english TEXT NOT NULL, chinese TEXT NOT NULL, " +
+                "note TEXT NOT NULL, proficiency INTEGER NOT NULL, " +
+                "lastSeenAt INTEGER NOT NULL, createdAt INTEGER NOT NULL)"
+        )
+    }
+}
+
 @Database(
-    entities = [ChatSessionEntity::class, ChatMessageEntity::class, TranslationEntity::class],
-    version = 4,
+    entities = [
+        ChatSessionEntity::class, ChatMessageEntity::class, TranslationEntity::class,
+        WordBookEntity::class, WordEntryEntity::class,
+    ],
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
     abstract fun translationDao(): TranslationDao
+    abstract fun wordBookDao(): WordBookDao
 }

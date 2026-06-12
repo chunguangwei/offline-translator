@@ -237,6 +237,29 @@
     <string name="practice_done">本轮全部记住了！</string>
     <string name="practice_close">完成</string>
 
+    <!-- 单词本 -->
+    <string name="wb_tab">单词本</string>
+    <string name="wb_new">新建单词本</string>
+    <string name="wb_empty">还没有单词本\n上传一份生词文本，AI 帮你提取建库</string>
+    <string name="wb_stats">%1$d 词 · 已掌握 %2$d · 每日 %3$d</string>
+    <string name="wb_delete">删除单词本</string>
+    <string name="wb_paste_hint">粘贴生词文本（英文词表或带中文释义都行）…</string>
+    <string name="wb_pick_file">选 txt 文件</string>
+    <string name="wb_extract">开始提取</string>
+    <string name="wb_extracting">AI 提取中… 已提取 %1$d 条</string>
+    <string name="wb_extract_done">提取完成，共 %1$d 条（可删除错误项）</string>
+    <string name="wb_name_hint">单词本名称（必填）</string>
+    <string name="wb_purpose_hint">用途说明（可选，如：考研核心词）</string>
+    <string name="wb_daily_goal">每日学习量</string>
+    <string name="wb_save">保存单词本</string>
+    <string name="wb_study_today">今日学习</string>
+    <string name="wb_quiz_all">全量抽查</string>
+    <string name="wb_dir_zh2en">中→英</string>
+    <string name="wb_dir_en2zh">英→中</string>
+    <string name="wb_dir_mixed">混合</string>
+    <string name="wb_reveal">想好了？点击查看答案</string>
+    <string name="wb_quiz_done">本轮 %1$d 张全部过关\n一次记住 %2$d 张</string>
+
     <!-- About / License -->
     <string name="settings_about">关于与许可</string>
     <string name="settings_about_app_line">译人 · v%1$s</string>

@@ -227,6 +227,29 @@
     <string name="practice_done">All done for this round!</string>
     <string name="practice_close">Done</string>
 
+    <!-- Word books -->
+    <string name="wb_tab">Word books</string>
+    <string name="wb_new">New word book</string>
+    <string name="wb_empty">No word books yet\nUpload a vocab text and AI will extract it</string>
+    <string name="wb_stats">%1$d words · %2$d mastered · %3$d/day</string>
+    <string name="wb_delete">Delete word book</string>
+    <string name="wb_paste_hint">Paste vocab text (word list or with Chinese meanings)…</string>
+    <string name="wb_pick_file">Pick .txt file</string>
+    <string name="wb_extract">Extract</string>
+    <string name="wb_extracting">Extracting… %1$d so far</string>
+    <string name="wb_extract_done">Done, %1$d entries (remove wrong ones)</string>
+    <string name="wb_name_hint">Word book name (required)</string>
+    <string name="wb_purpose_hint">Purpose (optional)</string>
+    <string name="wb_daily_goal">Daily goal</string>
+    <string name="wb_save">Save word book</string>
+    <string name="wb_study_today">Study today</string>
+    <string name="wb_quiz_all">Random quiz (all)</string>
+    <string name="wb_dir_zh2en">ZH→EN</string>
+    <string name="wb_dir_en2zh">EN→ZH</string>
+    <string name="wb_dir_mixed">Mixed</string>
+    <string name="wb_reveal">Got it in mind? Tap to reveal</string>
+    <string name="wb_quiz_done">All %1$d cards cleared\n%2$d on first try</string>
+
     <!-- About / License -->
     <string name="settings_about">About &amp; License</string>
     <string name="settings_about_app_line">Yiren · v%1$s</string>

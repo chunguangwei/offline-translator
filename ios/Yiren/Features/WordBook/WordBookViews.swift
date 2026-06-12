@@ -1,0 +1,488 @@
+import SwiftData
+import SwiftUI
+import UniformTypeIdentifiers
+
+// 单词本系统 —— 设计规则见 docs/superpowers/specs/2026-06-12-yiren-wordbook-design.md。
+// 上传文本 → Gemma 提取「english => 中文 => 注释」→ 命名建库 →
+// 今日学习（未掌握取 dailyGoal 个）/ 全量抽查（整本随机）→ 翻卡自评。
+
+/// 提取草稿（预览阶段）。
+struct VocabDraft: Identifiable, Equatable {
+    let id = UUID()
+    let english: String
+    let chinese: String
+    let note: String
+}
+
+/// 提取引擎逻辑（分块 + 流式解析 + 去重）。
+@MainActor
+final class VocabExtractor: ObservableObject {
+    @Published var isExtracting = false
+    @Published var loadingModel = false
+    @Published var drafts: [VocabDraft] = []
+    @Published var errorMessage: String?
+
+    private let gemma = GemmaService.shared
+    private var task: Task<Void, Never>?
+
+    func extract(_ text: String) {
+        guard !isExtracting else { return }
+        task?.cancel()
+        isExtracting = true
+        loadingModel = true
+        drafts = []
+        errorMessage = nil
+        task = Task {
+            if case .failure(let f) = await gemma.ensureLoaded() {
+                loadingModel = false
+                isExtracting = false
+                if case .modelMissing = f {
+                    errorMessage = PromptTemplates.isZhUi ? "请先到「设置 → 模型管理」下载模型" : "Download a model first"
+                }
+                return
+            }
+            loadingModel = false
+            var seen: [String: VocabDraft] = [:]
+            var order: [String] = []
+            do {
+                for chunk in Self.chunked(text) {
+                    if Task.isCancelled { break }
+                    let stream = try await gemma.generateStream(
+                        prompt: PromptTemplates.extractVocab(chunk),
+                        sampler: Samplers.precise
+                    )
+                    var buf = ""
+                    for try await delta in stream {
+                        if Task.isCancelled { break }
+                        buf += delta
+                        while let nl = buf.firstIndex(of: "\n") {
+                            let line = String(buf[..<nl])
+                            buf.removeSubrange(...nl)
+                            if let d = Self.parseLine(line), seen[d.english.lowercased()] == nil {
+                                seen[d.english.lowercased()] = d
+                                order.append(d.english.lowercased())
+                            }
+                        }
+                        drafts = order.compactMap { seen[$0] }
+                    }
+                    if let d = Self.parseLine(buf), seen[d.english.lowercased()] == nil {
+                        seen[d.english.lowercased()] = d
+                        order.append(d.english.lowercased())
+                        drafts = order.compactMap { seen[$0] }
+                    }
+                }
+                isExtracting = false
+            } catch {
+                if !Task.isCancelled { errorMessage = error.localizedDescription }
+                isExtracting = false
+            }
+        }
+    }
+
+    func cancel() {
+        task?.cancel()
+        gemma.cancelGeneration()
+        isExtracting = false
+        loadingModel = false
+    }
+
+    func reset() {
+        cancel()
+        drafts = []
+        errorMessage = nil
+    }
+
+    nonisolated static func chunked(_ text: String, size: Int = 1200) -> [String] {
+        var chunks: [String] = []
+        var cur = ""
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            if cur.count + line.count + 1 > size, !cur.isEmpty {
+                chunks.append(cur)
+                cur = ""
+            }
+            cur += line + "\n"
+        }
+        if !cur.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { chunks.append(cur) }
+        return chunks
+    }
+
+    nonisolated static func parseLine(_ raw: String) -> VocabDraft? {
+        let line = PromptTemplates.trimAtStop(raw).trimmingCharacters(in: .whitespaces)
+        guard line.contains("=>") else { return nil }
+        let parts = line.components(separatedBy: "=>").map {
+            $0.trimmingCharacters(in: CharacterSet(charactersIn: " 「」\"\t"))
+        }
+        let english = parts.count > 0 ? parts[0] : ""
+        let chinese = parts.count > 1 ? parts[1] : ""
+        let note = parts.count > 2 ? parts[2] : ""
+        guard english.rangeOfCharacter(from: .letters) != nil, english.count <= 60, !chinese.isEmpty else { return nil }
+        return VocabDraft(english: english, chinese: chinese, note: note)
+    }
+}
+
+// ───────────────────────── 列表 ─────────────────────────
+
+struct WordBooksSection: View {
+    @Query(sort: \WordBook.createdAt, order: .reverse) private var books: [WordBook]
+    @Environment(\.modelContext) private var context
+    @State private var showImport = false
+
+    private var zh: Bool { PromptTemplates.isZhUi }
+
+    var body: some View {
+        Group {
+            if books.isEmpty {
+                ContentUnavailableView(
+                    zh ? "还没有单词本" : "No word books yet",
+                    systemImage: "character.book.closed",
+                    description: Text(zh ? "上传一份生词文本，AI 帮你提取建库" : "Upload a vocab text and AI extracts it")
+                )
+            } else {
+                List {
+                    ForEach(books, id: \.persistentModelID) { book in
+                        NavigationLink {
+                            WordBookDetailView(book: book)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(book.name).font(.headline)
+                                if !book.purpose.isEmpty {
+                                    Text(book.purpose).font(.caption).foregroundStyle(.secondary)
+                                }
+                                let mastered = book.entries.filter { $0.proficiency >= 3 }.count
+                                Text(zh ? "\(book.entries.count) 词 · 已掌握 \(mastered) · 每日 \(book.dailyGoal)"
+                                        : "\(book.entries.count) words · \(mastered) mastered · \(book.dailyGoal)/day")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.brandPrimary)
+                            }
+                        }
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                context.delete(book) // 级联删词条
+                                try? context.save()
+                            } label: { Label(zh ? "删除" : "Delete", systemImage: "trash") }
+                        }
+                    }
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                showImport = true
+            } label: {
+                Label(zh ? "新建单词本" : "New word book", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.brandPrimary)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 6)
+        }
+        .sheet(isPresented: $showImport) { ImportWordBookView() }
+    }
+}
+
+// ───────────────────────── 导入 ─────────────────────────
+
+struct ImportWordBookView: View {
+    @StateObject private var extractor = VocabExtractor()
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var name = ""
+    @State private var purpose = ""
+    @State private var dailyGoal = 10
+    @State private var showFile = false
+
+    private var zh: Bool { PromptTemplates.isZhUi }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if extractor.drafts.isEmpty && !extractor.isExtracting {
+                    Section(zh ? "生词文本" : "Vocab text") {
+                        TextEditor(text: $text)
+                            .frame(minHeight: 140)
+                            .overlay(alignment: .topLeading) {
+                                if text.isEmpty {
+                                    Text(zh ? "粘贴生词文本（英文词表或带中文释义都行）…" : "Paste vocab text…")
+                                        .foregroundStyle(.tertiary)
+                                        .padding(.top, 8)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                        Button(zh ? "选 txt 文件" : "Pick .txt file") { showFile = true }
+                        Button(zh ? "开始提取" : "Extract") { extractor.extract(text) }
+                            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.brandPrimary)
+                        if let err = extractor.errorMessage {
+                            Text(err).font(.footnote).foregroundStyle(.red)
+                        }
+                    }
+                } else {
+                    Section {
+                        if extractor.isExtracting {
+                            HStack {
+                                ProgressView().controlSize(.small)
+                                Text(extractor.loadingModel
+                                     ? (zh ? "正在加载模型…" : "Loading model…")
+                                     : (zh ? "AI 提取中… 已提取 \(extractor.drafts.count) 条" : "Extracting… \(extractor.drafts.count)"))
+                                    .font(.caption)
+                                    .foregroundStyle(Color.brandPrimary)
+                                Spacer()
+                                Button(zh ? "停止" : "Stop") { extractor.cancel() }
+                                    .font(.caption)
+                            }
+                        } else {
+                            Text(zh ? "提取完成，共 \(extractor.drafts.count) 条（左滑删错误项）"
+                                    : "Done, \(extractor.drafts.count) entries")
+                                .font(.caption)
+                                .foregroundStyle(Color.brandPrimary)
+                        }
+                        ForEach(extractor.drafts) { d in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(d.english) — \(d.chinese)").font(.subheadline)
+                                if !d.note.isEmpty {
+                                    Text(d.note).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            .swipeActions {
+                                Button(role: .destructive) {
+                                    extractor.drafts.removeAll { $0.id == d.id }
+                                } label: { Label(zh ? "删除" : "Delete", systemImage: "trash") }
+                            }
+                        }
+                    }
+                    Section(zh ? "保存" : "Save") {
+                        TextField(zh ? "单词本名称（必填）" : "Name (required)", text: $name)
+                        TextField(zh ? "用途说明（可选）" : "Purpose (optional)", text: $purpose)
+                        Picker(zh ? "每日学习量" : "Daily goal", selection: $dailyGoal) {
+                            ForEach([5, 10, 20, 30], id: \.self) { Text("\($0)").tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        Button(zh ? "保存单词本" : "Save word book") { save() }
+                            .disabled(extractor.isExtracting || extractor.drafts.isEmpty
+                                      || name.trimmingCharacters(in: .whitespaces).isEmpty)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.brandPrimary)
+                    }
+                }
+            }
+            .navigationTitle(zh ? "新建单词本" : "New word book")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(zh ? "取消" : "Cancel") {
+                        extractor.reset()
+                        dismiss()
+                    }
+                }
+            }
+            .fileImporter(isPresented: $showFile, allowedContentTypes: [.plainText, .text]) { result in
+                if case .success(let url) = result {
+                    let secured = url.startAccessingSecurityScopedResource()
+                    defer { if secured { url.stopAccessingSecurityScopedResource() } }
+                    if let content = try? String(contentsOf: url, encoding: .utf8) {
+                        text = content
+                    }
+                }
+            }
+        }
+        .interactiveDismissDisabled(extractor.isExtracting)
+    }
+
+    private func save() {
+        let book = WordBook(name: name.trimmingCharacters(in: .whitespaces),
+                            purpose: purpose.trimmingCharacters(in: .whitespaces),
+                            dailyGoal: dailyGoal)
+        context.insert(book)
+        for d in extractor.drafts {
+            let e = WordEntry(english: d.english, chinese: d.chinese, note: d.note)
+            e.book = book
+            context.insert(e)
+        }
+        try? context.save()
+        extractor.reset()
+        dismiss()
+    }
+}
+
+// ───────────────────────── 详情 + 测试 ─────────────────────────
+
+enum QuizDirection: String, CaseIterable {
+    case zh2en, en2zh, mixed
+}
+
+struct WordBookDetailView: View {
+    let book: WordBook
+    @Environment(\.modelContext) private var context
+    @State private var direction: QuizDirection = .mixed
+    @State private var quizBatch: [WordEntry]?
+
+    private var zh: Bool { PromptTemplates.isZhUi }
+    private var mastered: Int { book.entries.filter { $0.proficiency >= 3 }.count }
+
+    var body: some View {
+        List {
+            Section {
+                Picker("", selection: $direction) {
+                    Text(zh ? "中→英" : "ZH→EN").tag(QuizDirection.zh2en)
+                    Text(zh ? "英→中" : "EN→ZH").tag(QuizDirection.en2zh)
+                    Text(zh ? "混合" : "Mixed").tag(QuizDirection.mixed)
+                }
+                .pickerStyle(.segmented)
+                HStack(spacing: 12) {
+                    Button(zh ? "今日学习" : "Study today") {
+                        // 未掌握词优先最久没见的，取每日量。
+                        quizBatch = book.entries
+                            .filter { $0.proficiency < 3 }
+                            .sorted { $0.lastSeenAt < $1.lastSeenAt }
+                            .prefix(book.dailyGoal)
+                            .shuffled()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.brandPrimary)
+                    .disabled(!book.entries.contains { $0.proficiency < 3 })
+                    Button(zh ? "全量抽查" : "Random quiz") {
+                        quizBatch = book.entries.shuffled()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(book.entries.isEmpty)
+                }
+            } footer: {
+                Text(zh ? "\(book.entries.count) 词 · 已掌握 \(mastered) · 认识 3 次即掌握"
+                        : "\(book.entries.count) words · \(mastered) mastered · 3 correct = mastered")
+            }
+            Section {
+                ForEach(book.entries.sorted { $0.createdAt < $1.createdAt }, id: \.persistentModelID) { e in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(e.english) — \(e.chinese)" + (e.proficiency >= 3 ? " ✓" : ""))
+                            .font(.subheadline)
+                        if !e.note.isEmpty {
+                            Text(e.note).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            context.delete(e)
+                            try? context.save()
+                        } label: { Label(zh ? "删除" : "Delete", systemImage: "trash") }
+                    }
+                }
+            }
+        }
+        .navigationTitle(book.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: Binding(
+            get: { quizBatch.map { QuizPayload(batch: $0, direction: direction) } },
+            set: { if $0 == nil { quizBatch = nil } }
+        )) { payload in
+            WordQuizView(payload: payload)
+        }
+    }
+}
+
+struct QuizPayload: Identifiable {
+    let id = UUID()
+    let batch: [WordEntry]
+    let direction: QuizDirection
+}
+
+/// 翻卡测试：正面按方向出题 → 「查看」翻面（答案+注释）→ 认识(+1，封顶3)/不认识(归0放回队尾)。
+struct WordQuizView: View {
+    let payload: QuizPayload
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @State private var queue: [WordEntry] = []
+    @State private var cardDirs: [PersistentIdentifier: QuizDirection] = [:]
+    @State private var missed: Set<PersistentIdentifier> = []
+    @State private var firstPass = 0
+    @State private var revealed = false
+
+    private var zh: Bool { PromptTemplates.isZhUi }
+    private var total: Int { payload.batch.count }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            if queue.isEmpty {
+                Spacer()
+                Text("🎉").font(.system(size: 56))
+                Text(zh ? "本轮 \(total) 张全部过关\n一次记住 \(firstPass) 张"
+                        : "All \(total) cleared\n\(firstPass) on first try")
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                Button(zh ? "完成" : "Done") { dismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.brandPrimary)
+                Spacer()
+            } else {
+                let card = queue[0]
+                let dir = cardDirs[card.persistentModelID] ?? .en2zh
+                Text(zh ? "第 \(total - queue.count + 1) / \(total) 张" : "Card \(total - queue.count + 1) / \(total)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 22)
+                Spacer()
+                VStack(spacing: 12) {
+                    Text(dir == .zh2en ? card.chinese : card.english)
+                        .font(.title2.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                    if revealed {
+                        Text(dir == .zh2en ? card.english : card.chinese)
+                            .font(.title3)
+                            .foregroundStyle(Color.brandPrimary)
+                            .multilineTextAlignment(.center)
+                        if !card.note.isEmpty {
+                            Text(card.note)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                    } else {
+                        Text(zh ? "想好了？点击查看答案" : "Got it in mind? Tap to reveal")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(26)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
+                .padding(.horizontal, 22)
+                .onTapGesture { revealed.toggle() }
+                Spacer()
+                HStack(spacing: 16) {
+                    Button(zh ? "不认识" : "Again") {
+                        grade(card, known: false)
+                        missed.insert(card.persistentModelID)
+                        let c = queue.removeFirst()
+                        queue.append(c)
+                        revealed = false
+                    }
+                    .buttonStyle(.bordered)
+                    Button(zh ? "认识" : "Got it") {
+                        grade(card, known: true)
+                        if !missed.contains(card.persistentModelID) { firstPass += 1 }
+                        queue.removeFirst()
+                        revealed = false
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.brandPrimary)
+                }
+                .padding(.bottom, 30)
+            }
+        }
+        .onAppear {
+            queue = payload.batch
+            cardDirs = Dictionary(uniqueKeysWithValues: payload.batch.map { e in
+                (e.persistentModelID, payload.direction == .mixed ? (Bool.random() ? .zh2en : .en2zh) : payload.direction)
+            })
+        }
+    }
+
+    private func grade(_ e: WordEntry, known: Bool) {
+        e.proficiency = known ? min(e.proficiency + 1, 3) : 0
+        e.lastSeenAt = .now
+        try? context.save()
+    }
+}

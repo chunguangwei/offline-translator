@@ -56,8 +56,9 @@ fun HistoryScreen(
 ) {
     val all by vm.items.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
-    // 全部 / 生词本 两档过滤；生词本可发起抽卡练习。
-    var starredOnly by remember { mutableStateOf(false) }
+    // 记录 / 生词本 / 单词本 三段；生词本可抽卡练习，单词本是独立体系（上传+测试）。
+    var tab by remember { mutableStateOf(0) }
+    val starredOnly = tab == 1
     var showPractice by remember { mutableStateOf(false) }
     val items = if (starredOnly) all.filter { it.starred } else all
 
@@ -76,7 +77,7 @@ fun HistoryScreen(
                 text = stringResource(R.string.history_title),
                 style = MaterialTheme.typography.headlineSmall,
             )
-            if (all.isNotEmpty() && !starredOnly) {
+            if (all.isNotEmpty() && tab == 0) {
                 TextButton(onClick = vm::clear) {
                     Text(stringResource(R.string.history_clear), color = MaterialTheme.colorScheme.primary)
                 }
@@ -85,14 +86,19 @@ fun HistoryScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
-                selected = !starredOnly,
-                onClick = { starredOnly = false },
+                selected = tab == 0,
+                onClick = { tab = 0 },
                 label = { Text(stringResource(R.string.history_filter_all)) },
             )
             FilterChip(
-                selected = starredOnly,
-                onClick = { starredOnly = true },
+                selected = tab == 1,
+                onClick = { tab = 1 },
                 label = { Text(stringResource(R.string.history_filter_starred)) },
+            )
+            FilterChip(
+                selected = tab == 2,
+                onClick = { tab = 2 },
+                label = { Text(stringResource(R.string.wb_tab)) },
             )
             Spacer(Modifier.weight(1f))
             if (starredOnly && items.isNotEmpty()) {
@@ -103,7 +109,9 @@ fun HistoryScreen(
         }
         Spacer(Modifier.height(8.dp))
 
-        if (items.isEmpty()) {
+        if (tab == 2) {
+            com.offlinetranslator.app.feature.wordbook.WordBooksSection()
+        } else if (items.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = stringResource(

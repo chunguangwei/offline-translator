@@ -169,6 +169,14 @@ enum PromptTemplates {
             + "Output as: \"<original> => <translation>\" per line, nothing else."
     }
 
+    /// 单词本导入：从文本块提取英文词条+中文释义（与 Android 同文案）。
+    static func extractVocab(_ chunk: String) -> String {
+        "从下面的文本中提取所有英文单词或短语，并给出对应的简体中文释义。"
+            + "如果文本里已有释义就使用它；没有就由你翻译补出。每行严格输出一条，"
+            + "格式为「英文 => 中文释义 => 简短注释」，注释可以是词性、例句或用法说明，"
+            + "没有就留空。不要输出编号、标题或任何其他内容。\n\n文本：\n\(chunk)"
+    }
+
     static func translate(_ text: String, fromZh: Bool) -> String {
         if fromZh {
             return "You are a precise translator. Translate the following Chinese text to natural, idiomatic English. "

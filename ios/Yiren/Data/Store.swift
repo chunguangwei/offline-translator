@@ -67,12 +67,52 @@ final class TranslationRecord {
     }
 }
 
+/// 单词本（用户上传文本 → AI 提取建库）。删本级联删词。
+@Model
+final class WordBook {
+    var name: String
+    /** 用途说明（可选）。 */
+    var purpose: String = ""
+    /** 每日学习量（5/10/20/30）。 */
+    var dailyGoal: Int = 10
+    var createdAt: Date
+    @Relationship(deleteRule: .cascade, inverse: \WordEntry.book)
+    var entries: [WordEntry] = []
+
+    init(name: String, purpose: String = "", dailyGoal: Int = 10, createdAt: Date = .now) {
+        self.name = name
+        self.purpose = purpose
+        self.dailyGoal = dailyGoal
+        self.createdAt = createdAt
+    }
+}
+
+/// 单词本词条。proficiency：测试「认识」+1、「不认识」归 0；≥3 视为已掌握。
+@Model
+final class WordEntry {
+    var english: String
+    var chinese: String
+    var note: String = ""
+    var proficiency: Int = 0
+    var lastSeenAt: Date = Date.distantPast
+    var createdAt: Date
+    var book: WordBook?
+
+    init(english: String, chinese: String, note: String = "", createdAt: Date = .now) {
+        self.english = english
+        self.chinese = chinese
+        self.note = note
+        self.createdAt = createdAt
+    }
+}
+
 /// 共享容器：App 与 ViewModel 都从这里拿主线程 context。
 enum DataStore {
     static let container: ModelContainer = {
         do {
             return try ModelContainer(
-                for: ChatSession.self, ChatMessage.self, TranslationRecord.self
+                for: ChatSession.self, ChatMessage.self, TranslationRecord.self,
+                WordBook.self, WordEntry.self
             )
         } catch {
             fatalError("SwiftData container init failed: \(error)")

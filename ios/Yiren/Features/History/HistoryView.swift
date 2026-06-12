@@ -6,25 +6,29 @@ struct HistoryView: View {
     @Query(sort: \TranslationRecord.createdAt, order: .reverse)
     private var records: [TranslationRecord]
     @Environment(\.modelContext) private var context
-    /// 全部 / 生词本 两档过滤；生词本可发起抽卡练习。
-    @State private var starredOnly = false
+    /// 记录 / 生词本 / 单词本 三段；单词本是独立体系（上传+测试）。
+    @State private var tab = 0
     @State private var showPractice = false
 
     private var zh: Bool { PromptTemplates.isZhUi }
+    private var starredOnly: Bool { tab == 1 }
     private var items: [TranslationRecord] { starredOnly ? records.filter(\.starred) : records }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("", selection: $starredOnly) {
-                    Text(zh ? "全部" : "All").tag(false)
-                    Text(zh ? "生词本" : "Word book").tag(true)
+                Picker("", selection: $tab) {
+                    Text(zh ? "记录" : "All").tag(0)
+                    Text(zh ? "生词本" : "Starred").tag(1)
+                    Text(zh ? "单词本" : "Word books").tag(2)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
 
-                if items.isEmpty {
+                if tab == 2 {
+                    WordBooksSection()
+                } else if items.isEmpty {
                     ContentUnavailableView(
                         starredOnly ? (zh ? "还没有收藏的生词" : "No starred words yet")
                                     : (zh ? "还没有翻译记录" : "No translations yet"),
@@ -87,7 +91,7 @@ struct HistoryView: View {
                     if starredOnly && !items.isEmpty {
                         Button(zh ? "开始练习" : "Practice") { showPractice = true }
                     }
-                    if !records.isEmpty && !starredOnly {
+                    if !records.isEmpty && tab == 0 {
                         Button(zh ? "清空" : "Clear", role: .destructive) {
                             for r in records { context.delete(r) }
                             try? context.save()
