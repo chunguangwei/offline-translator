@@ -38,6 +38,18 @@ data class UpdateManifest(
     val size: Long = 0,
 )
 
+/** 版本号数值比较（"1.0.10" > "1.0.9"；忽略非数字段）。抽出为顶层函数以便单测。 */
+internal fun isNewerVersion(remote: String, local: String): Boolean {
+    val r = remote.split('.', '-').mapNotNull { it.toIntOrNull() }
+    val l = local.split('.', '-').mapNotNull { it.toIntOrNull() }
+    for (i in 0 until maxOf(r.size, l.size)) {
+        val rv = r.getOrElse(i) { 0 }
+        val lv = l.getOrElse(i) { 0 }
+        if (rv != lv) return rv > lv
+    }
+    return false
+}
+
 /** Result of a "check for update" round-trip. */
 sealed interface UpdateResult {
     data object UpToDate : UpdateResult

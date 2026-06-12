@@ -144,7 +144,10 @@ final class GemmaService: ObservableObject {
                     loadedBackendPref = pref
                     visionEnabled = vision != nil
                     audioEnabled = audio != nil
-                    activeBackendLabel = (main.rawValue == "gpu") ? "GPU" : "CPU"
+                    // 主模型 GPU + 编码器 CPU 时如实显示混合状态（与 Android MIXED 对齐）。
+                    let mainGpu = main.rawValue == "gpu"
+                    let hasCpuEncoder = vision != nil || audio != nil
+                    activeBackendLabel = mainGpu ? (hasCpuEncoder ? "GPU + CPU" : "GPU") : "CPU"
                     state = .ready
                     return .success(info)
                 } catch {

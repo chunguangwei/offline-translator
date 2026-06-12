@@ -91,7 +91,7 @@ final class AudioRecorder: ObservableObject {
     }
 
     /// PCM16 峰值（0~1），判断是否真采到了声音。
-    static func peak(of pcm: Data) -> Float {
+    nonisolated static func peak(of pcm: Data) -> Float {
         guard pcm.count >= 2 else { return 0 }
         var maxAbs: Int32 = 0
         pcm.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
@@ -105,7 +105,7 @@ final class AudioRecorder: ObservableObject {
     }
 
     /// 裸 PCM16 → 最小 RIFF/WAVE（44 字节头）。
-    static func wavData(from pcm: Data, sampleRate: Int = 16_000) -> Data {
+    nonisolated static func wavData(from pcm: Data, sampleRate: Int = 16_000) -> Data {
         var out = Data(capacity: 44 + pcm.count)
         func w16(_ v: Int) { out.append(UInt8(v & 0xff)); out.append(UInt8((v >> 8) & 0xff)) }
         func w32(_ v: Int) {

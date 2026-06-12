@@ -57,7 +57,7 @@ class UpdateChecker @Inject constructor(
         // 1) 静态清单多源，不挨 API 限流。
         for (u in manifestUrls) {
             val m = runCatching { fetchManifest(u) }.getOrNull() ?: continue
-            return@withContext if (isNewer(m.version, BuildConfig.VERSION_NAME)) {
+            return@withContext if (isNewerVersion(m.version, BuildConfig.VERSION_NAME)) {
                 UpdateResult.Available(
                     version = m.version,
                     notes = m.notes.trim(),
@@ -100,7 +100,7 @@ class UpdateChecker @Inject constructor(
                 val latest = release.tagName.removePrefix("v").trim()
                 val apk = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
                     ?: return@use UpdateResult.Error("Release 未附带 APK")
-                if (isNewer(latest, BuildConfig.VERSION_NAME)) {
+                if (isNewerVersion(latest, BuildConfig.VERSION_NAME)) {
                     UpdateResult.Available(
                         version = latest,
                         notes = (release.body ?: release.name).orEmpty().trim(),
@@ -186,15 +186,4 @@ class UpdateChecker @Inject constructor(
         context.startActivity(intent)
     }
 
-    /** Compare dotted/dashed version strings numerically (e.g. "1.0.10" > "1.0.9"). */
-    private fun isNewer(remote: String, local: String): Boolean {
-        val r = remote.split('.', '-').mapNotNull { it.toIntOrNull() }
-        val l = local.split('.', '-').mapNotNull { it.toIntOrNull() }
-        for (i in 0 until maxOf(r.size, l.size)) {
-            val rv = r.getOrElse(i) { 0 }
-            val lv = l.getOrElse(i) { 0 }
-            if (rv != lv) return rv > lv
-        }
-        return false
-    }
 }

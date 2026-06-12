@@ -58,18 +58,7 @@ class ChatViewModel @Inject constructor(
     private val prefs: com.offlinetranslator.app.core.data.AppPreferencesRepository,
 ) : ViewModel() {
 
-    private companion object {
-        /** 未压缩消息超过这个条数 → 触发上下文压缩。 */
-        const val COMPRESS_AFTER_MESSAGES = 20
-        /**
-         * 未压缩消息总字数预算。超过即视为会话"满了"→ 触发压缩；同时也是单轮
-         * prompt 携带原文的硬上限（压缩没跟上时从最旧的开始裁）。模型窗口
-         * 4096 token，预留生成空间后中文按 ≈1 字/token 取 3000。
-         */
-        const val CONTEXT_CHAR_BUDGET = 3000
-        /** 压缩后保留的最近原文条数（其余并入摘要）。 */
-        const val KEEP_RAW_AFTER_COMPRESS = 6
-    }
+    // 上下文窗口阈值与裁剪算术收口在 engine/llm/ContextWindow（纯函数，有单测）。
 
     private val _ui = MutableStateFlow(ChatUi())
     val ui = _ui.asStateFlow()
@@ -289,7 +278,7 @@ class ChatViewModel @Inject constructor(
                 m.role to if (m.imageUri != null) PromptTemplates.historyImageNote(m.content)
                 else m.content
             }
-            val historyBefore = summaryTurns + fitContextBudget(rawTurns)
+            val historyBefore = summaryTurns + com.offlinetranslator.app.engine.llm.ContextWindow.fitBudget(rawTurns)
             // 文件写入/JPEG 压缩是阻塞 IO，挪到 IO 线程，别卡主线程。
             val imagePath = if (image != null) withContext(Dispatchers.IO) { saveImageToFile(image) } else null
             // 有图就让图片承担展示，文字可为空；图存失败才退回文字占位。
@@ -365,36 +354,20 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * 上下文裁剪兜底：正常情况下双方消息全量进上下文；只有当压缩还没跟上、
-     * 总字数已超预算时，才从最旧的开始裁（最近的消息永远保留）。
-     */
-    private fun fitContextBudget(turns: List<Pair<String, String>>): List<Pair<String, String>> {
-        var total = turns.sumOf { it.second.length }
-        var result = turns
-        while (result.size > 1 && total > CONTEXT_CHAR_BUDGET) {
-            total -= result.first().second.length
-            result = result.drop(1)
-        }
-        return result
-    }
-
-    /**
-     * 上下文压缩：未压缩消息超过 [COMPRESS_AFTER_MESSAGES] 条、或总字数超出
-     * [CONTEXT_CHAR_BUDGET]（会话"满了"）时，把较早的部分（保留最近
-     * [KEEP_RAW_AFTER_COMPRESS] 条原文）连同旧摘要一起压成 ≤200 字新摘要存到
+     * 上下文压缩：触发条件与窗口算术见 [com.offlinetranslator.app.engine.llm.ContextWindow]。
+     * 把较早的部分（保留最近几条原文）连同旧摘要一起压成 ≤200 字新摘要存到
      * 会话上。回答完成后后台静默执行，失败不影响对话（下轮再试）。
      */
     private fun maybeCompressContext(sid: String) {
         viewModelScope.launch {
             runCatching {
+                val cw = com.offlinetranslator.app.engine.llm.ContextWindow
                 val session = dao.getSession(sid) ?: return@launch
                 val all = dao.messagesOnce(sid)
                 val unsummarized = all.drop(session.summarizedCount)
                 val totalChars = unsummarized.sumOf { it.content.length }
-                if (unsummarized.size <= COMPRESS_AFTER_MESSAGES &&
-                    totalChars <= CONTEXT_CHAR_BUDGET
-                ) return@launch
-                val toCompress = unsummarized.dropLast(KEEP_RAW_AFTER_COMPRESS)
+                if (!cw.shouldCompress(unsummarized.size, totalChars)) return@launch
+                val toCompress = unsummarized.dropLast(cw.KEEP_RAW_AFTER_COMPRESS)
                 if (toCompress.isEmpty()) return@launch
                 val convText = toCompress.joinToString("\n") {
                     (if (it.role == "user") "用户：" else "助手：") + it.content
