@@ -57,7 +57,9 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            applicationIdSuffix = ".debug"
+            // 不加 applicationIdSuffix：debug 与 release 同包名同签名密钥，
+            // adb install -r 即真实覆盖升级（真机直装测试流程依赖此行为——
+            // 曾因 ".debug" 后缀装成孪生 App，用户一直打开旧正式版以为没修）。
             versionNameSuffix = "-debug"
         }
         release {
