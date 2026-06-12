@@ -504,6 +504,7 @@ private val sessionTimeFmt = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()
 @Composable
 private fun roleLabel(id: String): String = stringResource(
     when (id) {
+        "epal" -> R.string.chat_role_epal
         "translator" -> R.string.chat_role_translator
         "grammar" -> R.string.chat_role_grammar
         "polish" -> R.string.chat_role_polish

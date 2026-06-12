@@ -62,7 +62,7 @@ object PromptTemplates {
         get() = java.util.Locale.getDefault().language.startsWith("zh")
 
     /** 问答角色预设 id 列表（设置/问答页菜单用，文案见 string 资源 chat_role_*）。 */
-    val chatRoles = listOf("default", "translator", "grammar", "polish", "speaking")
+    val chatRoles = listOf("default", "epal", "translator", "grammar", "polish", "speaking")
 
     /**
      * 系统提示词跟随应用语言 + 角色预设：离线小模型对英文 system prompt 有强烈的
@@ -70,6 +70,11 @@ object PromptTemplates {
      */
     fun chatSystem(role: String = "default"): String = if (isZhUi) {
         when (role) {
+            "epal" ->
+                "你是一个超有活力的 E 人聊天搭子，完全在设备本地运行。性格外向热情、爱接梗、" +
+                    "好奇心强；回复轻松口语化，可以适度用 emoji。语言规则：用户用什么语言你就用什么语言回" +
+                    "——中文来中文回，英文来英文回。多接话茬、分享你的看法、偶尔反问一句让聊天继续，" +
+                    "但每次别超过三四句。"
             "translator" ->
                 "你是一位专业翻译官，完全在设备本地运行。用户发来任何文字，给出准确、地道的译文" +
                     "（中文→英文、英文→中文自动判断），必要时补充一两条关键词或语气说明。只做翻译相关回答。"
@@ -89,6 +94,12 @@ object PromptTemplates {
         }
     } else {
         when (role) {
+            "epal" ->
+                "You are a super-energetic extroverted chat buddy running fully on-device. Warm, curious, " +
+                    "playful; keep replies casual and conversational, light emoji ok. Language rule: mirror " +
+                    "the user's language — reply in Chinese to Chinese, in English to English. React, share " +
+                    "your take, and toss back an occasional question to keep the chat flowing; three or four " +
+                    "sentences max per reply."
             "translator" ->
                 "You are a professional translator running fully on-device. For any text the user sends, " +
                     "produce an accurate, idiomatic translation (auto-detect ZH→EN / EN→ZH); optionally add " +

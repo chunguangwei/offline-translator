@@ -74,7 +74,8 @@
     <string name="chat_role_translator">翻译官</string>
     <string name="chat_role_grammar">语法老师</string>
     <string name="chat_role_polish">写作润色</string>
-    <string name="chat_role_speaking">口语陪练</string>
+    <string name="chat_role_speaking">英语陪练</string>
+    <string name="chat_role_epal">E人陪聊</string>
     <string name="chat_image_remove">移除图片</string>
     <string name="chat_sessions">会话</string>
     <string name="chat_sessions_empty">暂无会话</string>

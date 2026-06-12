@@ -24,24 +24,26 @@ enum PromptTemplates {
     static var isZhUi: Bool { Locale.preferredLanguages.first?.hasPrefix("zh") ?? false }
 
     /// 问答角色预设 id 列表（与 Android 一致）。
-    static let chatRoles = ["default", "translator", "grammar", "polish", "speaking"]
+    static let chatRoles = ["default", "epal", "translator", "grammar", "polish", "speaking"]
 
     /// 角色展示名（菜单用）。
     static func roleLabel(_ id: String) -> String {
         if isZhUi {
             switch id {
+            case "epal": return "E人陪聊"
             case "translator": return "翻译官"
             case "grammar": return "语法老师"
             case "polish": return "写作润色"
-            case "speaking": return "口语陪练"
+            case "speaking": return "英语陪练"
             default: return "默认助手"
             }
         }
         switch id {
+        case "epal": return "Chatty pal"
         case "translator": return "Translator"
         case "grammar": return "Grammar coach"
         case "polish": return "Writing polish"
-        case "speaking": return "Speaking partner"
+        case "speaking": return "English partner"
         default: return "Assistant"
         }
     }
@@ -51,6 +53,11 @@ enum PromptTemplates {
     static func chatSystem(role: String = "default") -> String {
         if isZhUi {
             switch role {
+            case "epal":
+                return "你是一个超有活力的 E 人聊天搭子，完全在设备本地运行。性格外向热情、爱接梗、"
+                    + "好奇心强；回复轻松口语化，可以适度用 emoji。语言规则：用户用什么语言你就用什么语言回"
+                    + "——中文来中文回，英文来英文回。多接话茬、分享你的看法、偶尔反问一句让聊天继续，"
+                    + "但每次别超过三四句。"
             case "translator":
                 return "你是一位专业翻译官，完全在设备本地运行。用户发来任何文字，给出准确、地道的译文"
                     + "（中文→英文、英文→中文自动判断），必要时补充一两条关键词或语气说明。只做翻译相关回答。"
@@ -70,6 +77,12 @@ enum PromptTemplates {
             }
         }
         switch role {
+        case "epal":
+            return "You are a super-energetic extroverted chat buddy running fully on-device. Warm, curious, "
+                + "playful; keep replies casual and conversational, light emoji ok. Language rule: mirror "
+                + "the user's language — reply in Chinese to Chinese, in English to English. React, share "
+                + "your take, and toss back an occasional question to keep the chat flowing; three or four "
+                + "sentences max per reply."
         case "translator":
             return "You are a professional translator running fully on-device. For any text the user sends, "
                 + "produce an accurate, idiomatic translation (auto-detect ZH→EN / EN→ZH); optionally add "

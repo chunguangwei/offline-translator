@@ -68,7 +68,8 @@
     <string name="chat_role_translator">Translator</string>
     <string name="chat_role_grammar">Grammar coach</string>
     <string name="chat_role_polish">Writing polish</string>
-    <string name="chat_role_speaking">Speaking partner</string>
+    <string name="chat_role_speaking">English partner</string>
+    <string name="chat_role_epal">Chatty pal</string>
     <string name="chat_image_remove">Remove image</string>
     <string name="chat_sessions">Sessions</string>
     <string name="chat_sessions_empty">No sessions yet</string>
