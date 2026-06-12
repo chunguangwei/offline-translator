@@ -84,7 +84,8 @@ class TranslateViewModel @Inject constructor(
             _ui.update { it.copy(loadingModel = false, isModelMissing = false) }
             val prompt = PromptTemplates.translate(cur.input, cur.source == TranslateLang.ZH)
             try {
-                engine.generateStream(prompt).collect { token ->
+                // 翻译低温采样：与 iOS 一致，防译完目标语言后"刹不住车"滚出其他语言。
+                engine.generateStream(prompt, temperature = 0.2f).collect { token ->
                     _ui.update { it.copy(output = it.output + token) }
                 }
                 _ui.update { it.copy(isTranslating = false) }
@@ -138,7 +139,7 @@ class TranslateViewModel @Inject constructor(
             }
             _ui.update { it.copy(loadingModel = false, isModelMissing = false) }
             try {
-                engine.generateStream(PromptTemplates.visionTranslateText(), includeImage = bmp)
+                engine.generateStream(PromptTemplates.visionTranslateText(), includeImage = bmp, temperature = 0.2f)
                     .collect { token -> _ui.update { it.copy(output = it.output + token) } }
                 _ui.update { it.copy(isTranslating = false) }
             } catch (ce: kotlinx.coroutines.CancellationException) {
@@ -152,15 +153,18 @@ class TranslateViewModel @Inject constructor(
     fun startVoiceInput() {
         val cur = _ui.value
         if (cur.isRecording || cur.isTranscribing || cur.isTranslating) return
-        _ui.update { it.copy(isRecording = true, error = null) }
-        recordStartedAt = System.currentTimeMillis()
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                recorder.start()
-            } catch (t: Throwable) {
-                _ui.update { it.copy(isRecording = false, error = t.message) }
-            }
+        // 同步启动 + 成功才置"录音中"（与问答页一致）。此前先置状态再丢 IO 线程
+        // 异步启动，在 vivo 等较慢 ROM 上有竞态：快速点停时 stop 跑在 start 之前，
+        // 录音器空转、采到空音频，表现为"获取不了麦克风"。AudioRecord 创建是
+        // 毫秒级操作，主线程直接做没有问题。
+        try {
+            recorder.start()
+        } catch (t: Throwable) {
+            _ui.update { it.copy(error = t.message) }
+            return
         }
+        recordStartedAt = System.currentTimeMillis()
+        _ui.update { it.copy(isRecording = true, error = null) }
     }
 
     fun stopVoiceInput() {
@@ -196,7 +200,8 @@ class TranslateViewModel @Inject constructor(
             val prompt = PromptTemplates.transcribeVerbatim(cur.source == TranslateLang.ZH)
             val accum = StringBuilder()
             try {
-                engine.generateStream(prompt = prompt, includeAudioWav = wav).collect { token ->
+                // 转写用超低温：防意译/接话（见 ChatViewModel 同处注释）。
+                engine.generateStream(prompt = prompt, includeAudioWav = wav, temperature = 0.1f).collect { token ->
                     accum.append(token)
                     _ui.update { it.copy(input = accum.toString().trim(), isTranscribing = false) }
                 }

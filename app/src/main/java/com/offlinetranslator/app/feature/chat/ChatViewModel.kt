@@ -211,11 +211,12 @@ class ChatViewModel @Inject constructor(
         }
         val wav = pcmToWav(pcm)
         val zh = _ui.value.voiceLang == ChatVoiceLang.ZH
-        val prompt = if (zh) "请将这段语音逐字转写为中文，只输出转写结果，不要加任何说明。"
-        else "Transcribe the audio verbatim in English. Output only the transcript, nothing else."
+        // 统一用强化版逐字转写模板 + 超低温采样：高温(0.7)会让小模型意译/接话
+        //（用户真机实测"有时不是我说的内容"），转写必须确定性输出。
+        val prompt = PromptTemplates.transcribeVerbatim(fromZh = zh)
         val accum = StringBuilder()
         try {
-            engine.generateStream(prompt = prompt, includeAudioWav = wav).collect { token ->
+            engine.generateStream(prompt = prompt, includeAudioWav = wav, temperature = 0.1f).collect { token ->
                 accum.append(token)
                 _ui.update { it.copy(voicePartial = accum.toString().trim()) }
             }

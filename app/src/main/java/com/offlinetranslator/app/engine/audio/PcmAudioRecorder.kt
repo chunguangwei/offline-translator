@@ -55,11 +55,29 @@ class PcmAudioRecorder @Inject constructor() {
         captured.reset()
         val minBuf = AudioRecord.getMinBufferSize(sampleRate, channelConfig, encoding)
         val bufSize = (minBuf * 2).coerceAtLeast(sampleRate / 5) // ~200 ms buffer
-        record = AudioRecord(
+
+        // 部分 vivo 等 ROM 对 VOICE_RECOGNITION 音源限制（初始化静默失败或录不到声），
+        // 逐源回退到 MIC；初始化与启动状态都显式校验，失败抛可读错误而非静默空录。
+        var rec: AudioRecord? = null
+        for (source in intArrayOf(
             MediaRecorder.AudioSource.VOICE_RECOGNITION,
-            sampleRate, channelConfig, encoding, bufSize,
-        )
-        record?.startRecording()
+            MediaRecorder.AudioSource.MIC,
+        )) {
+            val candidate = AudioRecord(source, sampleRate, channelConfig, encoding, bufSize)
+            if (candidate.state != AudioRecord.STATE_INITIALIZED) {
+                candidate.release()
+                continue
+            }
+            candidate.startRecording()
+            if (candidate.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                runCatching { candidate.stop() }
+                candidate.release()
+                continue
+            }
+            rec = candidate
+            break
+        }
+        record = rec ?: throw IllegalStateException("麦克风启动失败：请检查录音权限或是否被其他应用占用")
         scope = CoroutineScope(Dispatchers.IO)
         recordJob = scope?.launch {
             val frame = ShortArray(sampleRate / 50) // 20 ms

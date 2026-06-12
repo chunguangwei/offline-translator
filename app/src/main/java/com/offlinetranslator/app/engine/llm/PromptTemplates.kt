@@ -49,11 +49,14 @@ object PromptTemplates {
      */
     fun transcribeVerbatim(fromZh: Boolean): String {
         val body = if (fromZh)
-            "请把这段语音逐字转写为简体中文。只输出转写出的文字本身，" +
-                "不要翻译、不要解释、不要加任何前后缀或标点说明。"
+            "你是一台语音转写机。把这段语音【逐字】转写成简体中文文字：说什么写什么，完全忠实原话。" +
+                "严禁翻译、严禁改写或润色、严禁总结、严禁回答或接话——即使内容是一个问题也只转写不回答。" +
+                "保留口语词和重复。只输出转写文字本身，不要任何前后缀。"
         else
-            "Transcribe this speech verbatim in English. Output ONLY the transcribed " +
-                "text itself — do not translate, explain, or add any prefix/suffix."
+            "You are a speech-to-text machine. Transcribe this speech VERBATIM in English: " +
+                "write exactly what is said, fully faithful. Never translate, never paraphrase, " +
+                "never summarize, never answer or respond — even if it is a question, transcribe only. " +
+                "Keep filler words and repetitions. Output ONLY the transcribed text."
         return wrap(body)
     }
 

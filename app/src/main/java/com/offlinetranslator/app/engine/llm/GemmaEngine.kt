@@ -347,6 +347,8 @@ class GemmaEngine @Inject constructor(
         prompt: String,
         includeImage: Bitmap? = null,
         includeAudioWav: ByteArray? = null,
+        /** 采样温度：对话 0.7；翻译/转写等确定性任务给低温（如 0.1）防自由发挥。 */
+        temperature: Float = 0.7f,
     ): Flow<String> = callbackFlow {
         genMutex.lock()
         var holdsLock = true
@@ -381,7 +383,7 @@ class GemmaEngine @Inject constructor(
             // Fresh conversation per call so we don't bleed history between turns.
             conv = activeEngine.createConversation(
                 ConversationConfig(
-                    samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
+                    samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = temperature.toDouble()),
                 )
             )
 
