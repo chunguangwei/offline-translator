@@ -64,11 +64,13 @@ class PcmAudioRecorder @Inject constructor() {
             MediaRecorder.AudioSource.MIC,
         )) {
             val candidate = AudioRecord(source, sampleRate, channelConfig, encoding, bufSize)
+            android.util.Log.i("OT-Mic", "source=$source state=${candidate.state}")
             if (candidate.state != AudioRecord.STATE_INITIALIZED) {
                 candidate.release()
                 continue
             }
             candidate.startRecording()
+            android.util.Log.i("OT-Mic", "source=$source recordingState=${candidate.recordingState}")
             if (candidate.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
                 runCatching { candidate.stop() }
                 candidate.release()
@@ -78,6 +80,7 @@ class PcmAudioRecorder @Inject constructor() {
             break
         }
         record = rec ?: throw IllegalStateException("麦克风启动失败：请检查录音权限或是否被其他应用占用")
+            .also { android.util.Log.e("OT-Mic", "all sources failed") }
         scope = CoroutineScope(Dispatchers.IO)
         recordJob = scope?.launch {
             val frame = ShortArray(sampleRate / 50) // 20 ms
@@ -105,10 +108,16 @@ class PcmAudioRecorder @Inject constructor() {
     }
 
     private fun calcAmp(data: ShortArray, len: Int): Float {
+        if (len == 0) return 0f
+        // 先去直流偏置再取平均幅度：部分 vivo 等机型麦克风采样整体偏移，
+        // 直接算绝对值平均会恒定爆表，波形顶死不随声音动（用户真机实测）。
+        var mean = 0L
+        for (i in 0 until len) mean += data[i].toLong()
+        val dc = (mean / len).toInt()
         var sum = 0L
-        for (i in 0 until len) sum += abs(data[i].toInt())
+        for (i in 0 until len) sum += abs(data[i] - dc).toLong()
         val avg = sum.toFloat() / len
-        return min(avg / 4_500f, 1f)
+        return min(avg / 2_500f, 1f)
     }
 
     private fun shortsToBytesLE(data: ShortArray): ByteArray {

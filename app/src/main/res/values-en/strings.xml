@@ -92,7 +92,7 @@
     <string name="chat_voice_recording">Recording…</string>
     <string name="chat_voice_transcribing">Transcribing audio…</string>
     <string name="chat_voice_transcribing_phase1">Decoding speech…</string>
-    <string name="chat_voice_transcribing_phase2">Sending shortly…</string>
+    <string name="chat_voice_transcribing_phase2">Polishing text…</string>
 
     <string name="voice_title">Voice</string>
     <string name="voice_tab_realtime">Quick translate</string>

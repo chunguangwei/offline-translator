@@ -210,9 +210,11 @@ final class GemmaService: ObservableObject {
                 with: ConversationConfig(samplerConfig: Samplers.precise)
             )
         } send: { conversation in
+            // 指令在前、音频在后：指令后置时模型偶发把指令当内容复读
+            //（用户真机实测"输入了很多提示词"）。
             conversation.sendMessageStream(Message(contents: [
-                .audioData(wav),
                 .text(PromptTemplates.transcribeVerbatim(zh: zh)),
+                .audioData(wav),
             ]))
         }
     }

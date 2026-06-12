@@ -98,7 +98,7 @@
     <string name="chat_voice_recording">录音中…</string>
     <string name="chat_voice_transcribing">正在识别语音…</string>
     <string name="chat_voice_transcribing_phase1">解析语音中…</string>
-    <string name="chat_voice_transcribing_phase2">即将发送…</string>
+    <string name="chat_voice_transcribing_phase2">整理文字中…</string>
 
     <!-- Voice -->
     <string name="voice_title">语音助手</string>

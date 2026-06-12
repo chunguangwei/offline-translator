@@ -113,6 +113,14 @@ struct TranslateView: View {
                             .foregroundStyle(.red)
                     }
                 } else {
+                    // 清空输入与译文。
+                    if !vm.input.isEmpty {
+                        Button { vm.clear() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.tertiary)
+                        }
+                        .disabled(vm.isTranslating)
+                    }
                     // 拍照翻译 / 选图翻译（识别图中文字逐行对照译出）。
                     Button { showCamera = true } label: {
                         Image(systemName: "camera.fill")
