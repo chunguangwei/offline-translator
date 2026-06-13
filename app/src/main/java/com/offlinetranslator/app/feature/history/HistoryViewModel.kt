@@ -30,7 +30,7 @@ class HistoryViewModel @Inject constructor(
         }
     }
 
-    fun clear() { viewModelScope.launch { dao.clearAll() } }
+    fun clear() { viewModelScope.launch { dao.clearAll(); reviewCardDao.deleteByType("STARRED") } }
 
     /** 收藏/取消收藏进生词本（单词练习的素材来源）。 */
     fun setStarred(id: Long, starred: Boolean) {

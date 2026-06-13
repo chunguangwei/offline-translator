@@ -283,6 +283,9 @@ interface ReviewCardDao {
 
     @Query("DELETE FROM review_card WHERE sourceType=:type AND sourceId IN (:ids)")
     suspend fun deleteBySourceIds(type: String, ids: List<Long>)
+
+    @Query("DELETE FROM review_card WHERE sourceType = :type")
+    suspend fun deleteByType(type: String)
 }
 
 @Database(
