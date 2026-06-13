@@ -241,7 +241,7 @@
     <string name="srs_today_due">今日到期 %1$d 张</string>
     <string name="srs_start_review">开始复习</string>
     <string name="srs_all_clear">今日已清空 🎉</string>
-    <string name="srs_session_summary">今日复习 %1$d 张 🎉</string>
+    <string name="srs_session_summary">今日复习 %1$d 张</string>
 
     <!-- 单词本 -->
     <string name="wb_tab">单词本</string>
