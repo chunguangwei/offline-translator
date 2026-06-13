@@ -64,6 +64,13 @@ class ModelDownloader @Inject constructor(
                 } }
             }
             if (attempt.isSuccess) {
+                // 校验长度后再转正：流提前结束（截断）时 fetch 不一定抛错，残缺
+                // .litertlm 会在下次 native initialize() 崩。不足则丢弃 .part 走下一源。
+                if (partFile.length() < info.sizeBytes * 0.99) {
+                    runCatching { partFile.delete() }
+                    lastError = "下载不完整（${partFile.length()}/${info.sizeBytes}）"
+                    continue
+                }
                 if (partFile.renameTo(finalFile)) {
                     storage.bumpRefresh()
                     trySend(DownloadProgress.Completed)

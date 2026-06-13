@@ -2,6 +2,10 @@ import Foundation
 import SwiftData
 import UIKit
 
+/// 问答页语音转写方向 —— 与 Android `ChatVoiceLang` 对齐：
+/// 让用户在中文界面下也能转写英文语音（反之亦然），不被 UI 语言写死。
+enum ChatVoiceLang { case zh, en }
+
 /// 问答状态机 —— 对应 Android `ChatViewModel.kt`，全部产品决策对齐：
 /// 上下文=摘要+全部未压缩双方消息；压缩 >20 条或 >3000 字（留 6 条原文）；
 /// 图片发送即清预览、窗口内追问重喂、压缩后停喂；语音=转写回填输入框；
@@ -22,6 +26,8 @@ final class ChatViewModel: ObservableObject {
     @Published var isGenerating = false
     @Published var isRecording = false
     @Published var isTranscribing = false
+    /// 语音转写方向（默认中文，可在录音条上切换；与 Android 一致）。
+    @Published var voiceLang: ChatVoiceLang = .zh
     /// 待发送的图片附件（发送即清，与主流 IM 一致）。
     @Published var attachedImage: UIImage?
     @Published var errorMessage: String?
@@ -324,7 +330,7 @@ final class ChatViewModel: ObservableObject {
         }
         do {
             let wav = AudioRecorder.wavData(from: pcm)
-            let stream = try await gemma.transcribe(wav: wav, zh: PromptTemplates.isZhUi)
+            let stream = try await gemma.transcribe(wav: wav, zh: voiceLang == .zh)
             var acc = ""
             for try await d in stream { acc += d }
             return acc.trimmingCharacters(in: .whitespacesAndNewlines)

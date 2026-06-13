@@ -132,9 +132,14 @@ class GemmaEngine @Inject constructor(
         }
 
         // Tear down any previously loaded engine before loading the new one.
-        runCatching { engine?.close() }
-        engine = null
-        loadedModelId = null
+        // 关引擎必须与在途生成互斥：generateStream 只持 genMutex（不持 mutex），
+        // 若此刻还在推理，直接 close 掉 native 引擎会 use-after-free → SIGSEGV。
+        // 先抢 genMutex 等当前生成收尾再拆。锁序恒为 mutex→genMutex，无死锁。
+        genMutex.withLock {
+            runCatching { engine?.close() }
+            engine = null
+            loadedModelId = null
+        }
 
         _status.value = EngineStatus(state = EngineState.LOADING, activeModel = info)
         return@withLock runCatching {
@@ -508,9 +513,12 @@ class GemmaEngine @Inject constructor(
     }.buffer(64)
 
     suspend fun unload() = mutex.withLock {
-        runCatching { engine?.close() }
-        engine = null
-        loadedModelId = null
+        // 同 ensureLoaded：等在途生成（仅持 genMutex）收尾再关引擎，防 use-after-free。
+        genMutex.withLock {
+            runCatching { engine?.close() }
+            engine = null
+            loadedModelId = null
+        }
         visionEnabled = false
         audioEnabled = false
         _status.value = EngineStatus()

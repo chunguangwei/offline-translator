@@ -36,6 +36,8 @@ data class UpdateManifest(
     val notes: String = "",
     val apk: String,
     val size: Long = 0,
+    /** APK 的 SHA-256（CI 发版写入）。客户端下载后强校验，防经代理/CDN 投毒。 */
+    val apkSha256: String = "",
 )
 
 /** 版本号数值比较（"1.0.10" > "1.0.9"；忽略非数字段）。抽出为顶层函数以便单测。 */
@@ -58,6 +60,8 @@ sealed interface UpdateResult {
         val notes: String,
         val apkUrl: String,
         val sizeBytes: Long,
+        /** 期望 APK SHA-256（清单源有；API 兜底为空表示无法校验）。 */
+        val apkSha256: String = "",
     ) : UpdateResult
     data class Error(val message: String) : UpdateResult
 }

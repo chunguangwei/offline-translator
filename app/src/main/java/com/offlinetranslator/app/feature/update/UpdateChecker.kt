@@ -63,6 +63,7 @@ class UpdateChecker @Inject constructor(
                     notes = m.notes.trim(),
                     apkUrl = m.apk,
                     sizeBytes = m.size,
+                    apkSha256 = m.apkSha256.trim(),
                 )
             } else {
                 UpdateResult.UpToDate
@@ -114,15 +115,22 @@ class UpdateChecker @Inject constructor(
         }.getOrElse { UpdateResult.Error(it.message ?: "网络错误") }
     }
 
-    fun download(url: String): Flow<DownloadStep> = callbackFlow {
+    fun download(url: String, expectedSha256: String = ""): Flow<DownloadStep> = callbackFlow {
         val dir = File(context.cacheDir, "update").apply { mkdirs() }
         val file = File(dir, "yiren-update.apk")
         trySend(DownloadStep.Progress(0, 0))
 
+        // 安全闸门一：APK 必须来自本仓官方 Release 直链，拒绝清单里被篡改成的任意域名。
+        val officialPrefix = "https://github.com/$repoPath/releases/download/"
+        if (!url.startsWith(officialPrefix)) {
+            trySend(DownloadStep.Failed("下载地址非官方 Release，已拒绝"))
+            close(); awaitClose { }; return@callbackFlow
+        }
+
         // github.com 直链在部分网络不可达 → gh-proxy 加速候选优先、直连兜底
-        // （ImagePilot 同款）。APK 升级安装受系统签名校验，代理无法篡改得逞。
+        // （ImagePilot 同款）。代理不可信，但下载后会强校验 SHA-256（安全闸门二）。
         val candidates = buildList {
-            if (url.startsWith("https://github.com/")) add("https://gh-proxy.com/$url")
+            add("https://gh-proxy.com/$url")
             add(url)
         }
 
@@ -153,6 +161,17 @@ class UpdateChecker @Inject constructor(
                 }
             }
             if (outcome.isSuccess) {
+                // 安全闸门二：有期望哈希就强校验，不匹配即丢弃（投毒/截断的 APK 进不来）。
+                // 清单源（latest.json）一定带哈希；只有 API 兜底路径拿不到，此时跳过
+                // 校验但已被闸门一限定为官方直链，风险可控。
+                if (expectedSha256.isNotBlank()) {
+                    val actual = runCatching { sha256Of(file) }.getOrNull()
+                    if (!actual.equals(expectedSha256, ignoreCase = true)) {
+                        file.delete()
+                        lastError = IOException("文件校验失败，可能被篡改")
+                        continue
+                    }
+                }
                 trySend(DownloadStep.Completed(file))
                 done = true
                 break
@@ -165,6 +184,20 @@ class UpdateChecker @Inject constructor(
         }
         close()
         awaitClose { }
+    }
+
+    /** 计算文件 SHA-256，返回小写十六进制。 */
+    private fun sha256Of(file: File): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { ins ->
+            val buf = ByteArray(64 * 1024)
+            while (true) {
+                val n = ins.read(buf)
+                if (n < 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
     }
 
     /** API 26+ requires per-app "install unknown apps" consent before launching the installer. */

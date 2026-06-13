@@ -88,7 +88,8 @@ class WordBookViewModel @Inject constructor(
             try {
                 for (chunk in chunked(text)) {
                     val sb = StringBuilder()
-                    engine.generateStream(PromptTemplates.extractVocab(chunk)).collect { token ->
+                    // 提取是确定性任务（照搬词表、补释义），低温防止乱编/漏词，与 iOS 对齐。
+                    engine.generateStream(PromptTemplates.extractVocab(chunk), temperature = 0.2f).collect { token ->
                         sb.append(token)
                         // 流式解析完整行，实时刷预览。
                         var nl = sb.indexOf("\n")

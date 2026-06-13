@@ -23,6 +23,9 @@ enum EngineFailure: Error {
 enum Samplers {
     static let precise = try? SamplerConfig(topK: 40, topP: 0.9, temperature: 0.2)
     static let chat = try? SamplerConfig(topK: 40, topP: 0.95, temperature: 0.7)
+    /// 语音逐字转写专用超低温（与 Android 的 0.1 对齐）：0.2 仍偶发意译/接话，
+    /// 转写要求最确定性的输出。
+    static let transcribe = try? SamplerConfig(topK: 40, topP: 0.9, temperature: 0.1)
 }
 
 /// 生成/引擎生命周期串行门 —— 对应 Android 的 mutex + genMutex：
@@ -106,7 +109,9 @@ final class GemmaService: ObservableObject {
             return .failure(.modelMissing)
         }
 
-        // 切换模型：先卸掉旧引擎。
+        // 切换模型：先卸掉旧引擎。currentConversation 必须同步清空——否则用户此刻
+        // 点「停止」，cancelGeneration 会对底层引擎已销毁的悬空会话调 cancel → 崩溃。
+        currentConversation = nil
         engine = nil
         loadedModelId = nil
         state = .loading
@@ -207,7 +212,7 @@ final class GemmaService: ObservableObject {
         guard audioEnabled else { throw EngineFailure.initFailed("audio encoder not enabled") }
         return try await gatedStream { engine in
             try await engine.createConversation(
-                with: ConversationConfig(samplerConfig: Samplers.precise)
+                with: ConversationConfig(samplerConfig: Samplers.transcribe)
             )
         } send: { conversation in
             // 指令在前、音频在后：指令后置时模型偶发把指令当内容复读
@@ -275,10 +280,14 @@ final class GemmaService: ObservableObject {
                     }
                 }
             }
-            continuation.onTermination = { _ in
+            continuation.onTermination = { [weak self] _ in
                 task.cancel()
-                // 流终止（完成/取消/出错）→ 放生成门。onTermination 恰好触发一次。
-                Task { await gate.release() }
+                // 流终止（完成/取消/出错）→ 放生成门 + 清当前会话（防停止键打到已结束会话）。
+                // onTermination 恰好触发一次。
+                Task {
+                    await gate.release()
+                    await self?.clearCurrentConversation()
+                }
             }
         }
     }
@@ -286,5 +295,10 @@ final class GemmaService: ObservableObject {
     /// 取消当前生成（翻译页「停止」按钮）。
     func cancelGeneration() {
         try? currentConversation?.cancel()
+    }
+
+    /// 流终止后清空当前会话引用（onTermination 调用），避免后续停止键打到已结束会话。
+    func clearCurrentConversation() {
+        currentConversation = nil
     }
 }

@@ -215,7 +215,7 @@
     <string name="settings_about_version">版本</string>
     <string name="settings_about_open_source">开源协议</string>
     <string name="settings_about_privacy">隐私声明</string>
-    <string name="settings_privacy_content">本应用所有 AI 推理均在本地完成，不上传任何文本、图片、音频。仅在你主动下载模型时进行联网。</string>
+    <string name="settings_privacy_content">本应用所有 AI 推理均在本地完成，绝不上传任何文本、图片、音频或使用行为。联网仅发生在三种情况：下载模型、检查更新、启动时获取启动图与运营信息——这些请求都不包含任何个人数据。</string>
 
     <!-- Splash -->
     <string name="splash_subtitle">离线 AI 翻译与问答</string>

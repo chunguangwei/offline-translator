@@ -46,16 +46,21 @@ object AppModule {
         .readTimeout(60, TimeUnit.SECONDS)
         .callTimeout(0, TimeUnit.MILLISECONDS) // model files are big
         .retryOnConnectionFailure(true)
-        .eventListener(object : okhttp3.EventListener() {
-            override fun callStart(call: okhttp3.Call) {
-                android.util.Log.i("OT-Net", "→ ${call.request().method} ${call.request().url}")
+        // 网络 URL 日志仅 debug 构建打印，避免发行版往 logcat 输出请求地址。
+        .apply {
+            if (com.offlinetranslator.app.BuildConfig.DEBUG) {
+                eventListener(object : okhttp3.EventListener() {
+                    override fun callStart(call: okhttp3.Call) {
+                        android.util.Log.i("OT-Net", "→ ${call.request().method} ${call.request().url}")
+                    }
+                    override fun callFailed(call: okhttp3.Call, ioe: java.io.IOException) {
+                        android.util.Log.e("OT-Net", "✗ ${call.request().url}", ioe)
+                    }
+                    override fun responseHeadersEnd(call: okhttp3.Call, response: okhttp3.Response) {
+                        android.util.Log.i("OT-Net", "← ${response.code} ${call.request().url}")
+                    }
+                })
             }
-            override fun callFailed(call: okhttp3.Call, ioe: java.io.IOException) {
-                android.util.Log.e("OT-Net", "✗ ${call.request().url}", ioe)
-            }
-            override fun responseHeadersEnd(call: okhttp3.Call, response: okhttp3.Response) {
-                android.util.Log.i("OT-Net", "← ${response.code} ${call.request().url}")
-            }
-        })
+        }
         .build()
 }

@@ -19,6 +19,7 @@ data class UpdateUiState(
     val latestVersion: String = "",
     val notes: String = "",
     val apkUrl: String = "",
+    val apkSha256: String = "",
     val sizeBytes: Long = 0,
     val downloaded: Long = 0,
     val total: Long = 0,
@@ -51,6 +52,7 @@ class UpdateViewModel @Inject constructor(
                     latestVersion = r.version,
                     notes = r.notes,
                     apkUrl = r.apkUrl,
+                    apkSha256 = r.apkSha256,
                     sizeBytes = r.sizeBytes,
                 )
                 UpdateResult.UpToDate -> _ui.value.copy(phase = UpdateUiState.Phase.UpToDate)
@@ -65,9 +67,10 @@ class UpdateViewModel @Inject constructor(
     fun startDownload() {
         val url = _ui.value.apkUrl
         if (url.isBlank()) return
+        val sha = _ui.value.apkSha256
         _ui.update { it.copy(phase = UpdateUiState.Phase.Downloading, downloaded = 0, total = 0) }
         viewModelScope.launch {
-            checker.download(url).collect { step ->
+            checker.download(url, sha).collect { step ->
                 _ui.update {
                     when (step) {
                         is DownloadStep.Progress ->

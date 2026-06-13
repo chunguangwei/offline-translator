@@ -36,9 +36,9 @@ fun peakPcm(pcm: ByteArray): Float {
     var maxAbs = 0
     var i = 0
     while (i + 1 < pcm.size) {
+        // 高字节 toInt() 已带符号扩展，s 即正确的有符号 16 位样本，无需再手工补符号。
         val s = (pcm[i].toInt() and 0xff) or (pcm[i + 1].toInt() shl 8)
-        val v = if (s and 0x8000 != 0) s or 0x7fff_0000.toInt().inv() else s
-        val a = if (v < 0) -v else v
+        val a = if (s < 0) -s else s
         if (a > maxAbs) maxAbs = a
         i += 2
     }

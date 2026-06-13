@@ -131,6 +131,13 @@ struct ChatView: View {
                     .foregroundStyle(Color.brandPrimary)
                 WaveBars(amplitudes: AudioRecorder.shared.amplitudes)
                     .frame(height: 22)
+                // 转写语言切换：中文界面下也能转写英文语音（与 Android 一致）。
+                Picker("", selection: $vm.voiceLang) {
+                    Text("中").tag(ChatVoiceLang.zh)
+                    Text("EN").tag(ChatVoiceLang.en)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 96)
             }
         }
         .padding(.horizontal, 16)
