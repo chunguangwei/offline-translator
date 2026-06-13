@@ -231,7 +231,7 @@
     <string name="srs_today_due">%1$d due today</string>
     <string name="srs_start_review">Start review</string>
     <string name="srs_all_clear">All clear today 🎉</string>
-    <string name="srs_session_summary">Reviewed %1$d · %2$d-day streak</string>
+    <string name="srs_session_summary">Reviewed %1$d today 🎉</string>
 
     <!-- Word books -->
     <string name="wb_tab">Word books</string>

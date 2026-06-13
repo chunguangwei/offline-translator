@@ -224,7 +224,10 @@ private fun SrsReviewDialog(
                     }
                     Text("🎉", style = MaterialTheme.typography.displaySmall)
                     Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.practice_done), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.srs_session_summary, reviewed),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     Spacer(Modifier.height(16.dp))
                     TextButton(onClick = onDismiss) { Text(stringResource(R.string.practice_close)) }
                 } else {
