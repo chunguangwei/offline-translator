@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.offlinetranslator.app.core.data.db.ReviewCardDao
+import com.offlinetranslator.app.core.data.db.ReviewCardEntity
 import com.offlinetranslator.app.core.data.db.WordBookDao
 import com.offlinetranslator.app.core.data.db.WordBookEntity
 import com.offlinetranslator.app.core.data.db.WordEntryEntity
@@ -39,6 +41,7 @@ class WordBookViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val engine: GemmaEngine,
     private val dao: WordBookDao,
+    private val reviewCardDao: ReviewCardDao,
 ) : ViewModel() {
 
     val books = dao.observeBooks()
@@ -150,6 +153,15 @@ class WordBookViewModel @Inject constructor(
                     note = it.note, createdAt = System.currentTimeMillis(),
                 )
             })
+            // 为该本所有词条建 SRS 复习卡（insertEntries 不回传 id，需查回）。
+            val entries = dao.entriesOnce(bookId) // 该本全部词条（含新插入的 id）
+            val now = System.currentTimeMillis()
+            reviewCardDao.insertAll(entries.map {
+                ReviewCardEntity(
+                    sourceType = "WORD_ENTRY", sourceId = it.id,
+                    box = 0, dueAt = now, missCount = 0, lastReviewedAt = 0, createdAt = now,
+                )
+            })
             resetImport()
             onDone()
         }
@@ -157,13 +169,19 @@ class WordBookViewModel @Inject constructor(
 
     fun deleteBook(id: Long) {
         viewModelScope.launch {
+            // 先删该本所有词条对应的复习卡，再删词条/本，保持 review_card 同步。
+            val ids = dao.entriesOnce(id).map { it.id }
+            reviewCardDao.deleteBySourceIds("WORD_ENTRY", ids)
             dao.deleteEntries(id)
             dao.deleteBook(id)
         }
     }
 
     fun deleteEntry(id: Long) {
-        viewModelScope.launch { dao.deleteEntry(id) }
+        viewModelScope.launch {
+            reviewCardDao.deleteBySource("WORD_ENTRY", id)
+            dao.deleteEntry(id)
+        }
     }
 
     // ── 测试 ──
@@ -188,6 +206,7 @@ class WordBookViewModel @Inject constructor(
     /** 自评：认识 +1（封顶 3），不认识归 0。 */
     fun grade(entry: WordEntryEntity, known: Boolean) {
         viewModelScope.launch {
+            // 全量抽查仅练手，不改 SRS 档位（dueAt/box 不动），避免打乱节奏
             val p = if (known) (entry.proficiency + 1).coerceAtMost(3) else 0
             dao.updateProficiency(entry.id, p, System.currentTimeMillis())
         }
