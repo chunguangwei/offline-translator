@@ -66,7 +66,10 @@ final class ModelDownloader: NSObject, ObservableObject {
             Task { @MainActor [weak self] in
                 for t in tasks where t.state == .running || t.state == .suspended {
                     guard let modelId = Self.modelId(of: t) else { continue }
-                    let total = max(t.countOfBytesExpectedToReceive, 1)
+                    // 后台会话重启后 expected 可能为 -1（未知）→ 回落到清单已知大小，
+                    // 否则 total=1 会让进度条瞬间爆表。
+                    let expected = t.countOfBytesExpectedToReceive
+                    let total = expected > 0 ? expected : (ModelRegistry.byId(modelId)?.sizeBytes ?? 1)
                     self?.phases[modelId] = .downloading(
                         fraction: Double(t.countOfBytesReceived) / Double(total),
                         downloaded: t.countOfBytesReceived, total: total

@@ -109,7 +109,10 @@ class GemmaEngine @Inject constructor(
     fun isAudioEnabled(): Boolean = audioEnabled
 
     suspend fun ensureLoaded(): Result<ModelInfo> = mutex.withLock {
-        val activeId = prefs.flow.first().activeModelId ?: ModelRegistry.DEFAULT.id
+        // 一次性快照偏好：activeModelId 与 backend 必须读同一份，否则两次采样之间
+        // 用户改了设置会读到不一致组合。
+        val prefsSnapshot = prefs.flow.first()
+        val activeId = prefsSnapshot.activeModelId ?: ModelRegistry.DEFAULT.id
         val info = ModelRegistry.byId(activeId) ?: ModelRegistry.DEFAULT
 
         // Engine already loaded with the right model? Done.
@@ -144,7 +147,7 @@ class GemmaEngine @Inject constructor(
         _status.value = EngineStatus(state = EngineState.LOADING, activeModel = info)
         return@withLock runCatching {
             withContext(ioDispatcher) {
-                val backendPref = prefs.flow.first().backend
+                val backendPref = prefsSnapshot.backend
                 // Build (mainCandidates, visionCandidates) per user preference.
                 // Each list is tried in order; first successful initialize() wins.
                 //  AUTO  → GPU first, fall back to CPU on driver issues.

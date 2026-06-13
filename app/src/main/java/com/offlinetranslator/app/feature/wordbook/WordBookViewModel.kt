@@ -122,7 +122,10 @@ class WordBookViewModel @Inject constructor(
     }
 
     fun removeDraft(d: VocabDraft) {
-        _import.update { ui -> ui.copy(drafts = ui.drafts - d, extractedCount = ui.drafts.size - 1) }
+        _import.update { ui ->
+            val next = ui.drafts - d
+            ui.copy(drafts = next, extractedCount = next.size)
+        }
     }
 
     fun resetImport() {

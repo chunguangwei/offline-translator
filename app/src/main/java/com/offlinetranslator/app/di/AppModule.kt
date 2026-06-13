@@ -27,7 +27,10 @@ object AppModule {
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "offline_translator.db")
             .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-            .fallbackToDestructiveMigration()
+            // 只在【降级】时允许销毁重建；正常升级必须靠上面的迁移链。
+            // 用全量 destructive 会在某次漏写迁移时静默清空用户会话/历史/单词本——
+            // 宁可升级崩溃暴露问题，也不能无声丢用户数据。
+            .fallbackToDestructiveMigrationOnDowngrade()
             .build()
 
     @Provides

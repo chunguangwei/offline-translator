@@ -76,9 +76,12 @@ class ChatViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<ChatSessionEntity>())
 
     /** 当前角色预设（default/translator/grammar/polish/speaking），持久化在 DataStore。 */
+    // Eagerly（非 WhileSubscribed）：send()/setChatRole() 会直接读 chatRole.value，
+    // 无 UI 订阅时 WhileSubscribed 会让上游停摆、.value 退回旧值 → 角色读错。
+    // 这是个廉价的 prefs 字符串，常驻订阅无成本。
     val chatRole = prefs.flow
         .map { it.chatRole }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "default")
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "default")
 
     fun setChatRole(role: String) {
         viewModelScope.launch {
