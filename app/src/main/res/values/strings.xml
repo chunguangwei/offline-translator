@@ -237,6 +237,11 @@
     <string name="practice_know">认识</string>
     <string name="practice_done">本轮全部记住了！</string>
     <string name="practice_close">完成</string>
+    <string name="srs_streak">🔥 连续 %1$d 天</string>
+    <string name="srs_today_due">今日到期 %1$d 张</string>
+    <string name="srs_start_review">开始复习</string>
+    <string name="srs_all_clear">今日已清空 🎉</string>
+    <string name="srs_session_summary">今日复习 %1$d 张 · 连续 %2$d 天</string>
 
     <!-- 单词本 -->
     <string name="wb_tab">单词本</string>
