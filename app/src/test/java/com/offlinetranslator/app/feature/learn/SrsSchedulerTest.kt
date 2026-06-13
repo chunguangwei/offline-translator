@@ -36,4 +36,27 @@ class SrsSchedulerTest {
         assertEquals(3, r.missCount)
         assertEquals(now, r.lastReviewedAt)
     }
+
+    // streak：用「本地日序号」（epochDay）做参数，避免时区/时钟问题
+    @Test fun `同一天再次完成不变`() {
+        val r = StreakLogic.onStudied(lastDay = 100, current = 5, today = 100)
+        assertEquals(100, r.lastStudyDay); assertEquals(5, r.currentStreak)
+    }
+    @Test fun `隔天完成加1`() {
+        val r = StreakLogic.onStudied(lastDay = 100, current = 5, today = 101)
+        assertEquals(101, r.lastStudyDay); assertEquals(6, r.currentStreak)
+    }
+    @Test fun `断档后重置为1`() {
+        val r = StreakLogic.onStudied(lastDay = 100, current = 5, today = 103)
+        assertEquals(103, r.lastStudyDay); assertEquals(1, r.currentStreak)
+    }
+    @Test fun `从未学习过首次为1`() {
+        val r = StreakLogic.onStudied(lastDay = 0, current = 0, today = 100)
+        assertEquals(100, r.lastStudyDay); assertEquals(1, r.currentStreak)
+    }
+    @Test fun `展示时断档显示0`() {
+        assertEquals(5, StreakLogic.displayStreak(lastDay = 100, current = 5, today = 100))
+        assertEquals(5, StreakLogic.displayStreak(lastDay = 100, current = 5, today = 101))
+        assertEquals(0, StreakLogic.displayStreak(lastDay = 100, current = 5, today = 102))
+    }
 }
