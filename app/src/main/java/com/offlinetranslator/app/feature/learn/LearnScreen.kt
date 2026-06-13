@@ -66,7 +66,11 @@ fun LearnScreen(
     val scope = rememberCoroutineScope()
     var showReview by remember { mutableStateOf(false) }
     var sessionItems by remember { mutableStateOf<List<LearnViewModel.ReviewItem>>(emptyList()) }
+    var hardItems by remember { mutableStateOf<List<LearnViewModel.ReviewItem>>(emptyList()) }
+    var showHardReview by remember { mutableStateOf(false) }
+    var hardSessionItems by remember { mutableStateOf<List<LearnViewModel.ReviewItem>>(emptyList()) }
     LaunchedEffect(Unit) { learnVm.refresh() }
+    LaunchedEffect(tab) { if (tab == 2) hardItems = learnVm.buildHardSession() }
 
     Column(
         modifier = Modifier
@@ -126,6 +130,7 @@ fun LearnScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(tab == 0, { tab = 0 }, label = { Text(stringResource(R.string.history_filter_starred)) })
             FilterChip(tab == 1, { tab = 1 }, label = { Text(stringResource(R.string.wb_tab)) })
+            FilterChip(tab == 2, { tab = 2 }, label = { Text(stringResource(R.string.srs_hard_tab)) })
             Spacer(Modifier.weight(1f))
             if (tab == 0 && starred.isNotEmpty()) {
                 TextButton(onClick = { showPractice = true }) {
@@ -137,6 +142,56 @@ fun LearnScreen(
 
         if (tab == 1) {
             WordBooksSection()
+        } else if (tab == 2) {
+            if (learnUi.hardCount == 0) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = stringResource(R.string.srs_hard_empty),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            } else {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.srs_hard_count, learnUi.hardCount),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        TextButton(onClick = {
+                            scope.launch {
+                                hardSessionItems = learnVm.buildHardSession()
+                                showHardReview = true
+                            }
+                        }) {
+                            Text(
+                                stringResource(R.string.srs_hard_practice),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(hardItems, key = { it.card.id }) { item ->
+                            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    Text(item.front, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        item.back,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         } else if (starred.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
@@ -184,6 +239,15 @@ fun LearnScreen(
             onGrade = { c, correct -> scope.launch { learnVm.grade(c, correct) } },
             onFinished = { count -> scope.launch { if (count > 0) learnVm.markStudiedToday(); learnVm.refresh() } },
             onDismiss = { showReview = false; learnVm.refresh() },
+        )
+    }
+
+    if (showHardReview) {
+        SrsReviewDialog(
+            items = hardSessionItems,
+            onGrade = { c, correct -> scope.launch { learnVm.grade(c, correct) } },
+            onFinished = { count -> scope.launch { if (count > 0) learnVm.markStudiedToday(); learnVm.refresh() } },
+            onDismiss = { showHardReview = false; learnVm.refresh(); scope.launch { hardItems = learnVm.buildHardSession() } },
         )
     }
 }

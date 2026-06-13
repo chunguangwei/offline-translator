@@ -232,6 +232,10 @@
     <string name="srs_start_review">Start review</string>
     <string name="srs_all_clear">All clear today 🎉</string>
     <string name="srs_session_summary">Reviewed %1$d today</string>
+    <string name="srs_hard_tab">Hard words</string>
+    <string name="srs_hard_count">%1$d hard words</string>
+    <string name="srs_hard_practice">Practice hard words</string>
+    <string name="srs_hard_empty">No hard words yet — keep it up 👍</string>
 
     <!-- Word books -->
     <string name="wb_tab">Word books</string>
