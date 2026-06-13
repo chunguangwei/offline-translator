@@ -296,6 +296,7 @@
     <string name="srs_reminder_title">每日复习提醒</string>
     <string name="srs_reminder_desc">到点提醒你复习到期单词（纯本地，不联网）</string>
     <string name="srs_reminder_time">提醒时间</string>
+    <string name="srs_reminder_body">📚 你有 %1$d 张单词待复习</string>
 
     <!-- Common -->
     <string name="common_ok">确定</string>

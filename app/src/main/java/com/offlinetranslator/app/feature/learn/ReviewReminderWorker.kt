@@ -64,7 +64,7 @@ class ReviewReminderWorker @AssistedInject constructor(
         val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(ctx.getString(R.string.app_name))
-            .setContentText("📚 你有 $due 张单词待复习")
+            .setContentText(applicationContext.getString(R.string.srs_reminder_body, due))
             .setAutoCancel(true)
             .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

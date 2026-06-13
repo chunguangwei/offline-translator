@@ -288,6 +288,7 @@
     <string name="srs_reminder_title">Daily review reminder</string>
     <string name="srs_reminder_desc">Local reminder to review due words (offline)</string>
     <string name="srs_reminder_time">Reminder time</string>
+    <string name="srs_reminder_body">📚 %1$d words due for review</string>
 
     <string name="common_retry">Retry</string>
     <string name="common_loading">Loading…</string>
