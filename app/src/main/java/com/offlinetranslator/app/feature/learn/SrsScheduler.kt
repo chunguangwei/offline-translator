@@ -36,3 +36,20 @@ object StreakLogic {
     fun displayStreak(lastDay: Long, current: Int, today: Long): Int =
         if (lastDay == today || lastDay == today - 1) current else 0
 }
+
+/** 今日到期池筛选纯逻辑。 */
+object DuePool {
+    /**
+     * 从全部卡里选出今日该练的：
+     *  - 到期卡：dueAt<=now 且 (box>=1 或 lastReviewedAt>0)  含答错打回但没练完的
+     *  - 新卡：box==0 且 lastReviewedAt==0，按 newLimit 取前 N（按传入顺序）
+     */
+    fun <T> select(
+        cards: List<T>, now: Long, newLimit: Int,
+        box: (T) -> Int, dueAt: (T) -> Long, lastReviewedAt: (T) -> Long,
+    ): List<T> {
+        val due = cards.filter { dueAt(it) <= now && (box(it) >= 1 || lastReviewedAt(it) > 0) }
+        val fresh = cards.filter { box(it) == 0 && lastReviewedAt(it) == 0L }.take(newLimit)
+        return due + fresh
+    }
+}

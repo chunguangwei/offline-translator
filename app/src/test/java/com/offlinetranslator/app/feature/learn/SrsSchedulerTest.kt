@@ -59,4 +59,24 @@ class SrsSchedulerTest {
         assertEquals(5, StreakLogic.displayStreak(lastDay = 100, current = 5, today = 101))
         assertEquals(0, StreakLogic.displayStreak(lastDay = 100, current = 5, today = 102))
     }
+
+    // DuePool.select：把卡分成「到期(含打回)」「新卡(受限额)」「未到期」
+    private data class C(val box: Int, val dueAt: Long, val last: Long) // 测试替身
+    @Test fun `到期与新卡与限额`() {
+        val now = 1_000L
+        val cards = listOf(
+            C(box = 2, dueAt = 500, last = 999),   // 到期旧卡 → 入选
+            C(box = 0, dueAt = 500, last = 999),    // 答错打回(last>0) → 入选、不受限额
+            C(box = 0, dueAt = 1000, last = 0),     // 新卡 #1
+            C(box = 0, dueAt = 1000, last = 0),     // 新卡 #2
+            C(box = 0, dueAt = 1000, last = 0),     // 新卡 #3（限额=2 时落选）
+            C(box = 3, dueAt = 5000, last = 999),   // 未到期 → 落选
+        )
+        val sel = DuePool.select(
+            cards = cards, now = now, newLimit = 2,
+            box = { it.box }, dueAt = { it.dueAt }, lastReviewedAt = { it.last },
+        )
+        // 2 张到期(含打回) + 2 张新卡（限额2）= 4
+        assertEquals(4, sel.size)
+    }
 }
