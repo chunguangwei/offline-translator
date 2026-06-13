@@ -109,6 +109,9 @@ interface TranslationDao {
     @Query("SELECT * FROM translation_history WHERE starred = 1")
     suspend fun starredOnce(): List<TranslationEntity>
 
+    @Query("SELECT * FROM translation_history WHERE id = :id")
+    suspend fun recordById(id: Long): TranslationEntity?
+
     @Query("DELETE FROM translation_history WHERE id = :id")
     suspend fun delete(id: Long)
 
@@ -187,6 +190,9 @@ interface WordBookDao {
 
     @Query("SELECT * FROM word_entry WHERE bookId = :bookId")
     suspend fun entriesOnce(bookId: Long): List<WordEntryEntity>
+
+    @Query("SELECT * FROM word_entry WHERE id = :id")
+    suspend fun entryById(id: Long): WordEntryEntity?
 
     @Insert
     suspend fun insertEntries(entries: List<WordEntryEntity>)
