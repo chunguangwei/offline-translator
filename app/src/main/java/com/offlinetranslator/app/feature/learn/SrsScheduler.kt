@@ -19,6 +19,13 @@ object SrsScheduler {
         else now + intervalsDays[newBox] * DAY_MS
         return Update(box = newBox, dueAt = dueAt, missCount = missCount, lastReviewedAt = now)
     }
+
+    /** 回填：现有词一律作新卡（box0/dueAt=now/last=0），受每日限额渐进放出。 */
+    fun backfillCard(sourceType: String, sourceId: Long, now: Long) =
+        com.offlinetranslator.app.core.data.db.ReviewCardEntity(
+            sourceType = sourceType, sourceId = sourceId,
+            box = 0, dueAt = now, missCount = 0, lastReviewedAt = 0, createdAt = now,
+        )
 }
 
 /** 连续打卡纯逻辑。用「本地日序号」(epochDay) 计算，避免时区耦合。 */

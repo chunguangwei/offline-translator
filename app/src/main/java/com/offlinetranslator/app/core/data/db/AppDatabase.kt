@@ -106,6 +106,9 @@ interface TranslationDao {
     @Query("UPDATE translation_history SET starred = :starred WHERE id = :id")
     suspend fun setStarred(id: Long, starred: Boolean)
 
+    @Query("SELECT * FROM translation_history WHERE starred = 1")
+    suspend fun starredOnce(): List<TranslationEntity>
+
     @Query("DELETE FROM translation_history WHERE id = :id")
     suspend fun delete(id: Long)
 

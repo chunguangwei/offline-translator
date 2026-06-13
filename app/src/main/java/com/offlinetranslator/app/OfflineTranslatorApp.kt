@@ -11,8 +11,12 @@ import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.WorkManager
 import com.offlinetranslator.app.core.i18n.LocaleManager
+import com.offlinetranslator.app.feature.learn.SrsBackfill
 import com.offlinetranslator.app.feature.models.download.ModelDownloadWorker
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -24,6 +28,9 @@ class OfflineTranslatorApp : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var srsBackfill: SrsBackfill
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -33,6 +40,9 @@ class OfflineTranslatorApp : Application(), Configuration.Provider {
         super.onCreate()
         createNotificationChannel()
         LocaleManager.init(this)
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { srsBackfill.runIfNeeded() }
+        }
     }
 
     private fun createNotificationChannel() {

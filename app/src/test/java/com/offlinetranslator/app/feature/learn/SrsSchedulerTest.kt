@@ -79,4 +79,11 @@ class SrsSchedulerTest {
         // 2 张到期(含打回) + 2 张新卡（限额2）= 4
         assertEquals(4, sel.size)
     }
+
+    @Test fun `回填一律 box0、dueAt now、last 0`() {
+        val card = SrsScheduler.backfillCard(sourceType = "WORD_ENTRY", sourceId = 42L, now = 999L)
+        assertEquals("WORD_ENTRY", card.sourceType); assertEquals(42L, card.sourceId)
+        assertEquals(0, card.box); assertEquals(999L, card.dueAt)
+        assertEquals(0, card.missCount); assertEquals(0L, card.lastReviewedAt)
+    }
 }
