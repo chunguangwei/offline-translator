@@ -9,6 +9,9 @@ struct SettingsView: View {
     @AppStorage("backendPref") private var backendPref = "AUTO"
     @AppStorage("modelSourcePref") private var modelSource = "CN_FIRST"
     @AppStorage("customMirrorBase") private var customMirrorBase = ""
+    @AppStorage("reminderEnabled") private var reminderEnabled = false
+    @AppStorage("reminderHour") private var reminderHour = 20
+    @AppStorage("reminderMinute") private var reminderMinute = 0
     @ObservedObject private var gemma = GemmaService.shared
     @State private var showModels = false
 
@@ -35,6 +38,38 @@ struct SettingsView: View {
                             UIApplication.shared.open(url)
                         }
                     }
+                }
+
+                Section {
+                    Toggle(zh ? "每日复习提醒" : "Daily review reminder", isOn: Binding(
+                        get: { reminderEnabled },
+                        set: { on in
+                            reminderEnabled = on
+                            if on {
+                                ReviewReminder.enable(hour: reminderHour, minute: reminderMinute)
+                            } else {
+                                ReviewReminder.disable()
+                            }
+                        }))
+                    if reminderEnabled {
+                        DatePicker(zh ? "提醒时间" : "Reminder time",
+                                   selection: Binding(
+                                     get: {
+                                        var c = DateComponents(); c.hour = reminderHour; c.minute = reminderMinute
+                                        return Calendar.current.date(from: c) ?? Date()
+                                     },
+                                     set: { d in
+                                        let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+                                        reminderHour = c.hour ?? 20; reminderMinute = c.minute ?? 0
+                                        ReviewReminder.enable(hour: reminderHour, minute: reminderMinute) // reschedule
+                                     }),
+                                   displayedComponents: .hourAndMinute)
+                    }
+                } header: {
+                    Text(zh ? "每日复习提醒" : "Daily review")
+                } footer: {
+                    Text(zh ? "到点提醒你复习到期单词（纯本地，不联网）"
+                            : "Local reminder to review due words (offline)")
                 }
 
                 Section(zh ? "模型" : "Model") {
