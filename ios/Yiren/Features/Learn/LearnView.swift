@@ -46,6 +46,7 @@ struct LearnView: View {
                                 Button {
                                     r.starred = false // 移出生词本
                                     try? context.save()
+                                    SrsStore.removeCard(context, sourceType: "STARRED", sourceId: r.uid)
                                 } label: { Label(zh ? "移出" : "Unstar", systemImage: "star.slash") }
                             }
                         }
@@ -63,6 +64,7 @@ struct LearnView: View {
             .sheet(isPresented: $showPractice) {
                 StarredPracticeView(items: starred)
             }
+            .task { SrsStore.runBackfillIfNeeded(context) }
         }
     }
 }

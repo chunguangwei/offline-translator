@@ -157,6 +157,7 @@ struct WordBooksSection: View {
                         }
                         .swipeActions {
                             Button(role: .destructive) {
+                                for e in book.entries { SrsStore.removeCard(context, sourceType: "WORD_ENTRY", sourceId: e.uid) }
                                 context.delete(book) // 级联删词条
                                 try? context.save()
                             } label: { Label(zh ? "删除" : "Delete", systemImage: "trash") }
@@ -301,6 +302,7 @@ struct ImportWordBookView: View {
             let e = WordEntry(english: d.english, chinese: d.chinese, note: d.note)
             e.book = book
             context.insert(e)
+            SrsStore.addCard(context, sourceType: "WORD_ENTRY", sourceId: e.uid)
         }
         try? context.save()
         extractor.reset()
@@ -365,6 +367,7 @@ struct WordBookDetailView: View {
                     }
                     .swipeActions {
                         Button(role: .destructive) {
+                            SrsStore.removeCard(context, sourceType: "WORD_ENTRY", sourceId: e.uid)
                             context.delete(e)
                             try? context.save()
                         } label: { Label(zh ? "删除" : "Delete", systemImage: "trash") }
