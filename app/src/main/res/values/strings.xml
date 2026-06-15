@@ -271,6 +271,18 @@
     <string name="wb_dir_mixed">混合</string>
     <string name="wb_reveal">想好了？点击查看答案</string>
     <string name="wb_quiz_done">本轮 %1$d 张全部过关\n一次记住 %2$d 张</string>
+    <string name="wb_edit_book">编辑单词本</string>
+    <string name="wb_add_word">添加词</string>
+    <string name="wb_add_extract">提取</string>
+    <string name="wb_add_manual">手动</string>
+    <string name="wb_add_to_book">保存到本</string>
+    <string name="wb_field_en">英文</string>
+    <string name="wb_field_zh">中文</string>
+    <string name="wb_field_note">备注（可选）</string>
+    <string name="wb_add_dup">该词已存在或英文/中文为空</string>
+    <string name="wb_edit_entry">编辑词条</string>
+    <string name="wb_edit_save">保存</string>
+    <string name="wb_edit_delete">删除</string>
 
     <!-- About / License -->
     <string name="settings_about">关于与许可</string>
@@ -313,4 +325,11 @@
     <string name="common_size_mb">%1$.1f MB</string>
     <string name="common_size_gb">%1$.2f GB</string>
     <string name="common_progress">%1$d%%</string>
+    <string name="backup_section">备份与还原</string>
+    <string name="backup_export">导出备份</string>
+    <string name="backup_restore">导入还原</string>
+    <string name="backup_hint">把单词本、学习进度、翻译/问答与设置导出为文件，换手机后导入即可恢复（不含模型文件）。</string>
+    <string name="backup_export_done">备份已导出</string>
+    <string name="backup_restore_done">已还原：%1$d 本 / %2$d 词 / %3$d 翻译 / %4$d 会话</string>
+    <string name="backup_restore_fail">无法读取备份文件</string>
 </resources>

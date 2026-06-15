@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -320,6 +321,9 @@ private fun BookDetail(
     var stats by remember { mutableStateOf(LearnViewModel.BookStats(0, 0, emptySet())) }
     var srsItems by remember { mutableStateOf<List<LearnViewModel.ReviewItem>>(emptyList()) }
     var showSrsReview by remember { mutableStateOf(false) }
+    var showEditBook by remember { mutableStateOf(false) }
+    var showAddWord by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<WordEntryEntity?>(null) }
     LaunchedEffect(book.id, entries) { stats = learnVm.bookStats(book.id) }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -327,13 +331,16 @@ private fun BookDetail(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
             }
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(book.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
                     stringResource(R.string.wb_stats_srs, entries.size, stats.mastered, stats.due),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            IconButton(onClick = { showEditBook = true }) {
+                Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.wb_edit_book))
             }
         }
         Spacer(Modifier.height(6.dp))
@@ -357,11 +364,17 @@ private fun BookDetail(
                 enabled = entries.isNotEmpty(),
             ) { Text(stringResource(R.string.wb_quiz_all)) }
         }
+        Spacer(Modifier.height(6.dp))
+        OutlinedButton(onClick = { vm.resetImport(); showAddWord = true }) {
+            Icon(Icons.Rounded.Add, contentDescription = null)
+            Spacer(Modifier.height(0.dp))
+            Text(stringResource(R.string.wb_add_word))
+        }
         Spacer(Modifier.height(8.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(entries, key = { it.id }) { e ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).clickable { editing = e }) {
                         Text(
                             "${e.english} — ${e.chinese}" + if (stats.masteredIds.contains(e.id)) " ✓" else "",
                             style = MaterialTheme.typography.bodyMedium,
@@ -392,6 +405,328 @@ private fun BookDetail(
             quizBatch = null
         } else {
             QuizDialog(batch = batch, direction = direction, vm = vm, onDismiss = { quizBatch = null })
+        }
+    }
+
+    if (showEditBook) {
+        EditBookDialog(book = book, vm = vm, onDismiss = { showEditBook = false })
+    }
+
+    if (showAddWord) {
+        AddWordDialog(
+            book = book,
+            vm = vm,
+            onDismiss = { vm.resetImport(); showAddWord = false },
+            onChanged = { scope.launch { stats = learnVm.bookStats(book.id) } },
+        )
+    }
+
+    editing?.let { e ->
+        EditEntryDialog(
+            entry = e,
+            vm = vm,
+            onDismiss = { editing = null },
+            onChanged = { scope.launch { stats = learnVm.bookStats(book.id) } },
+        )
+    }
+}
+
+// ───────────────────────── 编辑单词本信息 ─────────────────────────
+
+@Composable
+private fun EditBookDialog(
+    book: WordBookEntity,
+    vm: WordBookViewModel,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(book.name) }
+    var purpose by remember { mutableStateOf(book.purpose) }
+    var dailyGoal by remember { mutableStateOf(book.dailyGoal) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    stringResource(R.string.wb_edit_book),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    placeholder = { Text(stringResource(R.string.wb_name_hint)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = purpose, onValueChange = { purpose = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.wb_purpose_hint)) },
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(stringResource(R.string.wb_daily_goal), style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(5, 10, 20, 30).forEach { n ->
+                        FilterChip(
+                            selected = dailyGoal == n,
+                            onClick = { dailyGoal = n },
+                            label = { Text("$n") },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.practice_close)) }
+                    Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = { vm.updateBook(book.id, name, purpose, dailyGoal); onDismiss() },
+                        enabled = name.isNotBlank(),
+                    ) { Text(stringResource(R.string.wb_edit_save)) }
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────── 添加词（提取 / 手动） ─────────────────────────
+
+private enum class AddMode { EXTRACT, MANUAL }
+
+@Composable
+private fun AddWordDialog(
+    book: WordBookEntity,
+    vm: WordBookViewModel,
+    onDismiss: () -> Unit,
+    onChanged: () -> Unit,
+) {
+    val ui by vm.importUi.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var mode by remember { mutableStateOf(AddMode.EXTRACT) }
+    var text by remember { mutableStateOf("") }
+    // 手动
+    var en by remember { mutableStateOf("") }
+    var zh by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    var dupError by remember { mutableStateOf(false) }
+
+    val filePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch { vm.readTextFile(uri)?.let { text = it } }
+    }
+
+    Dialog(onDismissRequest = { if (!ui.isExtracting) onDismiss() }) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    stringResource(R.string.wb_add_word),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = mode == AddMode.EXTRACT,
+                        onClick = { mode = AddMode.EXTRACT },
+                        label = { Text(stringResource(R.string.wb_add_extract)) },
+                        enabled = !ui.isExtracting,
+                    )
+                    FilterChip(
+                        selected = mode == AddMode.MANUAL,
+                        onClick = { mode = AddMode.MANUAL },
+                        label = { Text(stringResource(R.string.wb_add_manual)) },
+                        enabled = !ui.isExtracting,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+
+                if (mode == AddMode.EXTRACT) {
+                    if (ui.drafts.isEmpty() && !ui.isExtracting) {
+                        OutlinedTextField(
+                            value = text,
+                            onValueChange = { text = it },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 200.dp),
+                            placeholder = { Text(stringResource(R.string.wb_paste_hint)) },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { filePicker.launch(arrayOf("text/*", "application/rtf")) }) {
+                                Text(stringResource(R.string.wb_pick_file))
+                            }
+                            Button(onClick = { vm.extract(text) }, enabled = text.isNotBlank()) {
+                                Text(stringResource(R.string.wb_extract))
+                            }
+                        }
+                        ui.error?.let {
+                            Spacer(Modifier.height(6.dp))
+                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else {
+                        if (ui.isExtracting) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
+                                Text(
+                                    "  " + stringResource(
+                                        if (ui.loadingModel) R.string.translate_loading_model
+                                        else R.string.wb_extracting, ui.extractedCount,
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(Modifier.weight(1f))
+                                TextButton(onClick = vm::cancelExtract) { Text(stringResource(R.string.practice_close)) }
+                            }
+                        } else {
+                            Text(
+                                stringResource(R.string.wb_extract_done, ui.drafts.size),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            items(ui.drafts, key = { it.english }) { d ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("${d.english} — ${d.chinese}", style = MaterialTheme.typography.bodyMedium)
+                                        if (d.note.isNotBlank()) {
+                                            Text(
+                                                d.note,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                    IconButton(onClick = { vm.removeDraft(d) }) {
+                                        Icon(Icons.Rounded.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = { vm.addExtractedToBook(book.id) { onChanged(); onDismiss() } },
+                            enabled = !ui.isExtracting && ui.drafts.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.wb_add_to_book)) }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = en, onValueChange = { en = it; dupError = false },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        placeholder = { Text(stringResource(R.string.wb_field_en)) },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = zh, onValueChange = { zh = it; dupError = false },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        placeholder = { Text(stringResource(R.string.wb_field_zh)) },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = note, onValueChange = { note = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(stringResource(R.string.wb_field_note)) },
+                    )
+                    if (dupError) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.wb_add_dup),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            vm.addManualEntry(book.id, en, zh, note) { ok ->
+                                if (ok) {
+                                    en = ""; zh = ""; note = ""; dupError = false
+                                    onChanged()
+                                } else {
+                                    dupError = true
+                                }
+                            }
+                        },
+                        enabled = en.isNotBlank() && zh.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.wb_add_word)) }
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────── 编辑词条 ─────────────────────────
+
+@Composable
+private fun EditEntryDialog(
+    entry: WordEntryEntity,
+    vm: WordBookViewModel,
+    onDismiss: () -> Unit,
+    onChanged: () -> Unit,
+) {
+    var en by remember { mutableStateOf(entry.english) }
+    var zh by remember { mutableStateOf(entry.chinese) }
+    var note by remember { mutableStateOf(entry.note) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    stringResource(R.string.wb_edit_entry),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = en, onValueChange = { en = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    placeholder = { Text(stringResource(R.string.wb_field_en)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = zh, onValueChange = { zh = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    placeholder = { Text(stringResource(R.string.wb_field_zh)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = note, onValueChange = { note = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.wb_field_note)) },
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { vm.deleteEntry(entry.id); onChanged(); onDismiss() }) {
+                        Text(stringResource(R.string.wb_edit_delete), color = MaterialTheme.colorScheme.error)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = { vm.updateEntry(entry.id, en, zh, note); onChanged(); onDismiss() },
+                        enabled = en.isNotBlank() && zh.isNotBlank(),
+                    ) { Text(stringResource(R.string.wb_edit_save)) }
+                }
+            }
         }
     }
 }

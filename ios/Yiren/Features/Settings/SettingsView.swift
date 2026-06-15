@@ -1,5 +1,7 @@
 import SwiftUI
+import SwiftData
 import UIKit
+import UniformTypeIdentifiers
 
 /// 设置 Tab —— 对应 Android SettingsScreen：主题/推理后端/模型管理/关于与许可。
 /// 无「应用更新」：iOS 由 App Store 承担（平台差异）；
@@ -13,7 +15,13 @@ struct SettingsView: View {
     @AppStorage("reminderHour") private var reminderHour = 20
     @AppStorage("reminderMinute") private var reminderMinute = 0
     @ObservedObject private var gemma = GemmaService.shared
+    @Environment(\.modelContext) private var context
     @State private var showModels = false
+    // 备份与还原
+    @State private var exportURL: URL?
+    @State private var showImporter = false
+    @State private var restoreAlert = false
+    @State private var restoreMessage = ""
 
     private var zh: Bool { PromptTemplates.isZhUi }
     private var version: String {
@@ -70,6 +78,27 @@ struct SettingsView: View {
                 } footer: {
                     Text(zh ? "到点提醒你复习到期单词（纯本地，不联网）"
                             : "Local reminder to review due words (offline)")
+                }
+
+                Section {
+                    Button {
+                        prepareExport()
+                    } label: {
+                        Label(zh ? "导出备份" : "Export backup", systemImage: "square.and.arrow.up")
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button {
+                        showImporter = true
+                    } label: {
+                        Label(zh ? "导入还原" : "Import & restore", systemImage: "square.and.arrow.down")
+                    }
+                    .foregroundStyle(.primary)
+                } header: {
+                    Text(zh ? "备份与还原" : "Backup & Restore")
+                } footer: {
+                    Text(zh ? "把单词本、学习进度、翻译/问答与设置导出为文件，换手机后导入即可恢复（不含模型文件）。"
+                            : "Export word books, study progress, translations/chats and settings to a file; import on a new phone to restore (model files not included).")
                 }
 
                 Section(zh ? "模型" : "Model") {
@@ -148,6 +177,55 @@ struct SettingsView: View {
             }
             .navigationTitle(zh ? "设置" : "Settings")
             .sheet(isPresented: $showModels) { ModelsView() }
+            .sheet(item: $exportURL) { url in
+                ActivityView(items: [url])
+            }
+            .fileImporter(isPresented: $showImporter,
+                          allowedContentTypes: [.json],
+                          allowsMultipleSelection: false) { result in
+                handleImport(result)
+            }
+            .alert(zh ? "还原" : "Restore", isPresented: $restoreAlert) {
+                Button(zh ? "好" : "OK", role: .cancel) {}
+            } message: {
+                Text(restoreMessage)
+            }
+        }
+    }
+
+    // 导出：构建 JSON → 写入临时文件 → 分享。
+    private func prepareExport() {
+        let backup = BackupIO.buildBackup(context)
+        let data = BackupCodec.encode(backup)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("译人备份.json")
+        try? data.write(to: url, options: .atomic)
+        exportURL = url
+    }
+
+    // 导入：读取（处理安全作用域 URL）→ 还原 → 弹结果。
+    private func handleImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure:
+            restoreMessage = zh ? "无法读取所选文件" : "Could not read the selected file"
+            restoreAlert = true
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url) else {
+                restoreMessage = zh ? "无法读取所选文件" : "Could not read the selected file"
+                restoreAlert = true
+                return
+            }
+            switch BackupIO.restore(context, json: data) {
+            case .failure(let msg):
+                restoreMessage = msg
+            case .success(let b, let e, let t, let c):
+                restoreMessage = zh
+                    ? "已导入：单词本 \(b)、词条 \(e)、翻译/收藏 \(t)、问答 \(c)"
+                    : "Imported: \(b) books, \(e) entries, \(t) translations, \(c) chats"
+            }
+            restoreAlert = true
         }
     }
 

@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -26,6 +27,18 @@ import javax.inject.Inject
 
 /** 提取出的词条草稿（预览阶段，可删错项后再入库）。 */
 data class VocabDraft(val english: String, val chinese: String, val note: String)
+
+/** 批次内按英文键（trim+lowercase）去重 + 排除 existingKeys，保持原顺序；空英文丢弃。 */
+fun dedupDrafts(drafts: List<VocabDraft>, existingKeys: Set<String>): List<VocabDraft> {
+    val seen = HashSet(existingKeys)
+    val out = ArrayList<VocabDraft>()
+    for (d in drafts) {
+        val k = d.english.trim().lowercase()
+        if (k.isEmpty()) continue
+        if (seen.add(k)) out.add(d)
+    }
+    return out
+}
 
 data class ImportUi(
     val isExtracting: Boolean = false,
@@ -52,8 +65,15 @@ class WordBookViewModel @Inject constructor(
 
     private var extractJob: Job? = null
 
-    fun entries(bookId: Long) = dao.observeEntries(bookId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<WordEntryEntity>())
+    // 每本单词本的词条流按 bookId 缓存：同一本始终返回同一个 StateFlow。
+    // 否则每次 Compose 重组都新建一条 stateIn（重发 emptyList→list，且泄漏 5s 上游协程），
+    // 与详情页 LaunchedEffect 形成无限重组 → 闪烁、协程爆炸最终崩溃。
+    private val entryFlows = mutableMapOf<Long, StateFlow<List<WordEntryEntity>>>()
+
+    fun entries(bookId: Long): StateFlow<List<WordEntryEntity>> = entryFlows.getOrPut(bookId) {
+        dao.observeEntries(bookId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<WordEntryEntity>())
+    }
 
     // ── 导入：读文件 ──
 
@@ -100,7 +120,7 @@ class WordBookViewModel @Inject constructor(
                         var nl = sb.indexOf("\n")
                         while (nl >= 0) {
                             parseLine(sb.substring(0, nl))?.let { d ->
-                                seen.putIfAbsent(d.english.lowercase(), d)
+                                seen.putIfAbsent(d.english.trim().lowercase(), d)
                             }
                             sb.delete(0, nl + 1)
                             nl = sb.indexOf("\n")
@@ -109,7 +129,7 @@ class WordBookViewModel @Inject constructor(
                             it.copy(extractedCount = seen.size, drafts = seen.values.toList())
                         }
                     }
-                    parseLine(sb.toString())?.let { d -> seen.putIfAbsent(d.english.lowercase(), d) }
+                    parseLine(sb.toString())?.let { d -> seen.putIfAbsent(d.english.trim().lowercase(), d) }
                     _import.update { it.copy(extractedCount = seen.size, drafts = seen.values.toList()) }
                 }
                 _import.update { it.copy(isExtracting = false) }
@@ -140,7 +160,7 @@ class WordBookViewModel @Inject constructor(
 
     /** 保存为新单词本。 */
     fun saveBook(name: String, purpose: String, dailyGoal: Int, onDone: () -> Unit) {
-        val drafts = _import.value.drafts
+        val drafts = dedupDrafts(_import.value.drafts, emptySet())
         if (name.isBlank() || drafts.isEmpty()) return
         viewModelScope.launch {
             val bookId = dao.insertBook(
@@ -166,6 +186,74 @@ class WordBookViewModel @Inject constructor(
             })
             resetImport()
             onDone()
+        }
+    }
+
+    /** 把当前导入草稿(_import.drafts)合并去重后加入已有单词本，并为新词建 SRS 卡。 */
+    fun addExtractedToBook(bookId: Long, onDone: () -> Unit) {
+        viewModelScope.launch {
+            val existingKeys = dao.entriesOnce(bookId).map { it.english.trim().lowercase() }.toSet()
+            val toAdd = dedupDrafts(_import.value.drafts, existingKeys)
+            if (toAdd.isNotEmpty()) {
+                val now = System.currentTimeMillis()
+                dao.insertEntries(toAdd.map {
+                    WordEntryEntity(
+                        bookId = bookId, english = it.english, chinese = it.chinese,
+                        note = it.note, createdAt = now,
+                    )
+                })
+                // insertAll 对 (sourceType, sourceId) 唯一索引用 IGNORE，已有卡的词条会被忽略，仅新词建卡。
+                val cardNow = System.currentTimeMillis()
+                reviewCardDao.insertAll(dao.entriesOnce(bookId).map {
+                    ReviewCardEntity(
+                        sourceType = "WORD_ENTRY", sourceId = it.id,
+                        box = 0, dueAt = cardNow, missCount = 0, lastReviewedAt = 0, createdAt = cardNow,
+                    )
+                })
+            }
+            resetImport()
+            onDone()
+        }
+    }
+
+    /** 手动加一条；英文键在本内已存在则返回 false 不加。en/zh 必填。回调在主线程回传结果。 */
+    fun addManualEntry(bookId: Long, english: String, chinese: String, note: String, onResult: (Boolean) -> Unit) {
+        val en = english.trim()
+        val zh = chinese.trim()
+        val nt = note.trim()
+        if (en.isBlank() || zh.isBlank()) {
+            onResult(false)
+            return
+        }
+        viewModelScope.launch {
+            val dup = dao.entriesOnce(bookId).any { it.english.trim().lowercase() == en.lowercase() }
+            if (dup) {
+                onResult(false)
+                return@launch
+            }
+            val now = System.currentTimeMillis()
+            dao.insertEntries(listOf(
+                WordEntryEntity(bookId = bookId, english = en, chinese = zh, note = nt, createdAt = now)
+            ))
+            reviewCardDao.insertAll(dao.entriesOnce(bookId).map {
+                ReviewCardEntity(
+                    sourceType = "WORD_ENTRY", sourceId = it.id,
+                    box = 0, dueAt = now, missCount = 0, lastReviewedAt = 0, createdAt = now,
+                )
+            })
+            onResult(true)
+        }
+    }
+
+    fun updateEntry(id: Long, english: String, chinese: String, note: String) {
+        viewModelScope.launch {
+            dao.updateEntry(id, english.trim(), chinese.trim(), note.trim())
+        }
+    }
+
+    fun updateBook(id: Long, name: String, purpose: String, dailyGoal: Int) {
+        viewModelScope.launch {
+            dao.updateBook(id, name.trim(), purpose.trim(), dailyGoal.coerceAtLeast(1))
         }
     }
 

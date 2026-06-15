@@ -25,9 +25,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,8 +46,11 @@ import com.offlinetranslator.app.core.data.ModelSource
 import com.offlinetranslator.app.core.designsystem.components.GlassCard
 import com.offlinetranslator.app.core.designsystem.theme.ThemeMode
 import com.offlinetranslator.app.core.i18n.AppLanguage
+import com.offlinetranslator.app.feature.backup.BackupViewModel
 import com.offlinetranslator.app.feature.learn.cancelDaily
 import com.offlinetranslator.app.feature.learn.scheduleDaily
+import android.widget.Toast
+import kotlinx.coroutines.launch
 import com.offlinetranslator.app.feature.update.UpdateDialogHost
 import com.offlinetranslator.app.feature.update.UpdateUiState
 import com.offlinetranslator.app.feature.update.UpdateViewModel
@@ -64,6 +69,53 @@ fun SettingsScreen(
     UpdateDialogHost(updateVm)
 
     val context = LocalContext.current
+
+    // ---- Backup & restore ----
+    val backupVm: BackupViewModel = hiltViewModel()
+    val scope = rememberCoroutineScope()
+    var backupMsg by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(backupMsg) {
+        backupMsg?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            backupMsg = null
+        }
+    }
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                val json = backupVm.buildBackupJson()
+                context.contentResolver.openOutputStream(it)?.use { os ->
+                    os.write(json.toByteArray(Charsets.UTF_8))
+                }
+                backupMsg = context.getString(R.string.backup_export_done)
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                val text = context.contentResolver.openInputStream(it)?.use { ins ->
+                    ins.readBytes().toString(Charsets.UTF_8)
+                }
+                backupMsg = if (text == null) {
+                    context.getString(R.string.backup_restore_fail)
+                } else {
+                    when (val r = backupVm.restore(text)) {
+                        is BackupViewModel.RestoreResult.Success ->
+                            context.getString(
+                                R.string.backup_restore_done,
+                                r.books, r.entries, r.translations, r.chats,
+                            )
+                        is BackupViewModel.RestoreResult.Failure -> r.reason
+                    }
+                }
+            }
+        }
+    }
 
     // On Android 13+ enabling the reminder requires the POST_NOTIFICATIONS
     // runtime permission. We persist + schedule regardless of the result so the
@@ -293,6 +345,29 @@ fun SettingsScreen(
                     ),
                 )
             }
+        }
+
+        SettingSection(title = stringResource(R.string.backup_section)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { exportLauncher.launch("译人备份.json") },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.backup_export))
+                }
+                Button(
+                    onClick = { importLauncher.launch(arrayOf("application/json")) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.backup_restore))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.backup_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         SettingSection(title = stringResource(R.string.settings_about)) {

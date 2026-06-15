@@ -376,6 +376,10 @@ struct WordBookDetailView: View {
     @State private var showSrsReview = false
     // SRS 统计（到期数 / 已掌握=box≥6 / 已掌握词 uid 集），进页与复习后刷新。
     @State private var stats: (due: Int, mastered: Int, masteredUids: Set<String>) = (0, 0, [])
+    // 编辑本信息 / 添加词 / 编辑词条 三个 sheet。
+    @State private var showEditBook = false
+    @State private var showAddWords = false
+    @State private var editingEntry: WordEntry?
 
     private var zh: Bool { PromptTemplates.isZhUi }
 
@@ -406,6 +410,11 @@ struct WordBookDetailView: View {
                     .buttonStyle(.bordered)
                     .disabled(book.entries.isEmpty)
                 }
+                Button {
+                    showAddWords = true
+                } label: {
+                    Label(zh ? "添加词" : "Add words", systemImage: "plus.circle")
+                }
             } footer: {
                 Text(zh ? "\(book.entries.count) 词 · 已掌握 \(stats.mastered) · 今日到期 \(stats.due)"
                         : "\(book.entries.count) words · \(stats.mastered) mastered · \(stats.due) due today")
@@ -419,6 +428,8 @@ struct WordBookDetailView: View {
                             Text(e.note).font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture { editingEntry = e }
                     .swipeActions {
                         Button(role: .destructive) {
                             SrsStore.removeCard(context, sourceType: "WORD_ENTRY", sourceId: e.uid)
@@ -431,6 +442,11 @@ struct WordBookDetailView: View {
         }
         .navigationTitle(book.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showEditBook = true } label: { Image(systemName: "pencil") }
+            }
+        }
         .onAppear { refreshStats() }
         .sheet(item: $quizPayload) { payload in
             WordQuizView(payload: payload)
@@ -441,6 +457,15 @@ struct WordBookDetailView: View {
                 onGrade: { c, ok in SrsStore.grade(context, c, correct: ok) },
                 onFinished: { n in if n > 0 { SrsStore.markStudiedToday() }; refreshStats() }
             )
+        }
+        .sheet(isPresented: $showEditBook, onDismiss: { refreshStats() }) {
+            EditWordBookView(book: book)
+        }
+        .sheet(isPresented: $showAddWords, onDismiss: { refreshStats() }) {
+            AddWordsView(book: book)
+        }
+        .sheet(item: $editingEntry, onDismiss: { refreshStats() }) { entry in
+            EditWordEntryView(entry: entry)
         }
     }
 }
@@ -546,5 +571,331 @@ struct WordQuizView: View {
         e.proficiency = known ? min(e.proficiency + 1, 3) : 0
         e.lastSeenAt = .now
         try? context.save()
+    }
+}
+
+// ───────────────────────── 编辑本信息 ─────────────────────────
+
+/// 编辑单词本基本信息：名称 / 用途 / 每日学习量。
+struct EditWordBookView: View {
+    let book: WordBook
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var purpose: String
+    @State private var dailyGoal: Int
+
+    private var zh: Bool { PromptTemplates.isZhUi }
+
+    init(book: WordBook) {
+        self.book = book
+        _name = State(initialValue: book.name)
+        _purpose = State(initialValue: book.purpose)
+        _dailyGoal = State(initialValue: book.dailyGoal)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(zh ? "单词本名称（必填）" : "Name (required)", text: $name)
+                    TextField(zh ? "用途说明（可选）" : "Purpose (optional)", text: $purpose)
+                    Picker(zh ? "每日学习量" : "Daily goal", selection: $dailyGoal) {
+                        ForEach([5, 10, 20, 30], id: \.self) { Text("\($0)").tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+            .navigationTitle(zh ? "编辑单词本" : "Edit word book")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(zh ? "取消" : "Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(zh ? "保存" : "Save") { save() }
+                        .fontWeight(.semibold)
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        book.name = name.trimmingCharacters(in: .whitespaces)
+        book.purpose = purpose.trimmingCharacters(in: .whitespaces)
+        book.dailyGoal = max(1, dailyGoal)
+        try? context.save()
+        dismiss()
+    }
+}
+
+// ───────────────────────── 添加词（提取 / 手动）─────────────────────────
+
+/// 给已有单词本添加词：提取（粘贴文本 → AI 提取 → 批量保存）或手动逐条添加。
+/// 两种方式保存前都按英文键去重（dedupDrafts / 手动 contains 检查），跳过已存在词。
+struct AddWordsView: View {
+    let book: WordBook
+    @StateObject private var extractor = VocabExtractor()
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+
+    private enum Mode: Hashable { case extract, manual }
+    @State private var mode: Mode = .extract
+
+    // 提取模式
+    @State private var text = ""
+    @State private var showFile = false
+    @FocusState private var editorFocused: Bool
+
+    // 手动模式
+    @State private var mEnglish = ""
+    @State private var mChinese = ""
+    @State private var mNote = ""
+    @State private var manualError: String?
+    @State private var addedCount = 0
+
+    private var zh: Bool { PromptTemplates.isZhUi }
+
+    /// 当前本里已有的英文键（trim+lowercase）。
+    private var existingKeys: Set<String> {
+        Set(book.entries.map { $0.english.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("", selection: $mode) {
+                        Text(zh ? "提取" : "Extract").tag(Mode.extract)
+                        Text(zh ? "手动" : "Manual").tag(Mode.manual)
+                    }
+                    .pickerStyle(.segmented)
+                }
+                if mode == .extract { extractSection } else { manualSection }
+            }
+            .navigationTitle(zh ? "添加词" : "Add words")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(zh ? "取消" : "Cancel") {
+                        extractor.reset()
+                        dismiss()
+                    }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(zh ? "完成" : "Done") { editorFocused = false }
+                }
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .fileImporter(isPresented: $showFile, allowedContentTypes: [.plainText, .rtf]) { result in
+                if case .success(let url) = result {
+                    let secured = url.startAccessingSecurityScopedResource()
+                    defer { if secured { url.stopAccessingSecurityScopedResource() } }
+                    if let content = ImportWordBookView.readImportedText(from: url) {
+                        text = content
+                    }
+                }
+            }
+        }
+        .interactiveDismissDisabled(extractor.isExtracting)
+    }
+
+    @ViewBuilder private var extractSection: some View {
+        if extractor.drafts.isEmpty && !extractor.isExtracting {
+            Section(zh ? "生词文本" : "Vocab text") {
+                TextEditor(text: $text)
+                    .frame(minHeight: 140, maxHeight: 280)
+                    .focused($editorFocused)
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text(zh ? "粘贴生词文本（英文词表或带中文释义都行）…" : "Paste vocab text…")
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 8)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                Button(zh ? "选 txt 文件" : "Pick .txt file") { showFile = true }
+                Button(zh ? "开始提取" : "Extract") { extractor.extract(text) }
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.brandPrimary)
+                if let err = extractor.errorMessage {
+                    Text(err).font(.footnote).foregroundStyle(.red)
+                }
+            }
+        } else {
+            Section {
+                if extractor.isExtracting {
+                    HStack {
+                        ProgressView().controlSize(.small)
+                        Text(extractor.loadingModel
+                             ? (zh ? "正在加载模型…" : "Loading model…")
+                             : (zh ? "AI 提取中… 已提取 \(extractor.drafts.count) 条" : "Extracting… \(extractor.drafts.count)"))
+                            .font(.caption)
+                            .foregroundStyle(Color.brandPrimary)
+                        Spacer()
+                        Button(zh ? "停止" : "Stop") { extractor.cancel() }
+                            .font(.caption)
+                    }
+                } else {
+                    Text(zh ? "提取完成，共 \(extractor.drafts.count) 条（下方左滑删错误项）"
+                            : "Done, \(extractor.drafts.count) entries")
+                        .font(.caption)
+                        .foregroundStyle(Color.brandPrimary)
+                }
+            }
+            Section {
+                Button(zh ? "保存到本" : "Save to book") { saveExtracted() }
+                    .disabled(extractor.isExtracting || extractor.drafts.isEmpty)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.brandPrimary)
+            }
+            Section(zh ? "已提取 \(extractor.drafts.count) 条" : "\(extractor.drafts.count) entries") {
+                ForEach(extractor.drafts) { d in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(d.english) — \(d.chinese)").font(.subheadline)
+                        if !d.note.isEmpty {
+                            Text(d.note).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            extractor.drafts.removeAll { $0.id == d.id }
+                        } label: { Label(zh ? "删除" : "Delete", systemImage: "trash") }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var manualSection: some View {
+        Section(zh ? "新词" : "New word") {
+            TextField(zh ? "英文（必填）" : "English (required)", text: $mEnglish)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            TextField(zh ? "中文（必填）" : "Chinese (required)", text: $mChinese)
+            TextField(zh ? "注释（可选）" : "Note (optional)", text: $mNote)
+            if let err = manualError {
+                Text(err).font(.footnote).foregroundStyle(.red)
+            }
+            Button(zh ? "添加" : "Add") { addManual() }
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.brandPrimary)
+        }
+        if addedCount > 0 {
+            Section {
+                Text(zh ? "本次已添加 \(addedCount) 词" : "Added \(addedCount) word(s)")
+                    .font(.caption)
+                    .foregroundStyle(Color.brandPrimary)
+            }
+        }
+    }
+
+    private func saveExtracted() {
+        let toAdd = dedupDrafts(extractor.drafts, existingKeys: existingKeys)
+        for d in toAdd {
+            let e = WordEntry(english: d.english, chinese: d.chinese, note: d.note)
+            e.book = book
+            context.insert(e)
+            SrsStore.addCard(context, sourceType: "WORD_ENTRY", sourceId: e.uid)
+        }
+        try? context.save()
+        extractor.reset()
+        dismiss()
+    }
+
+    private func addManual() {
+        let english = mEnglish.trimmingCharacters(in: .whitespacesAndNewlines)
+        let chinese = mChinese.trimmingCharacters(in: .whitespacesAndNewlines)
+        let note = mNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        if english.isEmpty || chinese.isEmpty {
+            manualError = zh ? "英文和中文都要填" : "English and Chinese required"
+            return
+        }
+        if existingKeys.contains(english.lowercased()) {
+            manualError = zh ? "已存在" : "Already exists"
+            return
+        }
+        let e = WordEntry(english: english, chinese: chinese, note: note)
+        e.book = book
+        context.insert(e)
+        SrsStore.addCard(context, sourceType: "WORD_ENTRY", sourceId: e.uid)
+        try? context.save()
+        // 清空输入，保持 sheet 打开以便继续添加。
+        mEnglish = ""
+        mChinese = ""
+        mNote = ""
+        manualError = nil
+        addedCount += 1
+    }
+}
+
+// ───────────────────────── 编辑词条 ─────────────────────────
+
+/// 编辑单条词：改英文/中文/注释，或删除。
+struct EditWordEntryView: View {
+    let entry: WordEntry
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @State private var english: String
+    @State private var chinese: String
+    @State private var note: String
+
+    private var zh: Bool { PromptTemplates.isZhUi }
+
+    init(entry: WordEntry) {
+        self.entry = entry
+        _english = State(initialValue: entry.english)
+        _chinese = State(initialValue: entry.chinese)
+        _note = State(initialValue: entry.note)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(zh ? "英文（必填）" : "English (required)", text: $english)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    TextField(zh ? "中文（必填）" : "Chinese (required)", text: $chinese)
+                    TextField(zh ? "注释（可选）" : "Note (optional)", text: $note)
+                }
+                Section {
+                    Button(role: .destructive) { deleteEntry() } label: {
+                        Text(zh ? "删除" : "Delete")
+                    }
+                }
+            }
+            .navigationTitle(zh ? "编辑词条" : "Edit entry")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(zh ? "取消" : "Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(zh ? "保存" : "Save") { save() }
+                        .fontWeight(.semibold)
+                        .disabled(english.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                  || chinese.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        entry.english = english.trimmingCharacters(in: .whitespacesAndNewlines)
+        entry.chinese = chinese.trimmingCharacters(in: .whitespacesAndNewlines)
+        entry.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        try? context.save()
+        dismiss()
+    }
+
+    private func deleteEntry() {
+        SrsStore.removeCard(context, sourceType: "WORD_ENTRY", sourceId: entry.uid)
+        context.delete(entry)
+        try? context.save()
+        dismiss()
     }
 }

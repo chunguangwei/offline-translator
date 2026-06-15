@@ -24,8 +24,8 @@ android {
         // Min API 26 (Android 8) — covers all Huawei Mate 10 / P20 / nova 3 onward.
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.0.13"
+        versionCode = 15
+        versionName = "1.0.14"
 
         // Restrict to ABIs that LiteRT ships. Most modern Huawei devices
         // (Mate / P / nova) are arm64-v8a; armeabi-v7a kept for older fallback.
@@ -195,6 +195,9 @@ dependencies {
 
     // Test
     testImplementation("junit:junit:4.13.2")
+    // org.json is only a stub in the Android JVM unit-test classpath (every call
+    // throws "Stub!"); pull the real impl so BackupCodec encode/decode runs in tests.
+    testImplementation("org.json:json:20231013")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")

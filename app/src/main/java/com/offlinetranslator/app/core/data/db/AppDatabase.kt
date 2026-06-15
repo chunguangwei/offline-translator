@@ -185,6 +185,9 @@ interface WordBookDao {
     @Query("DELETE FROM word_book WHERE id = :id")
     suspend fun deleteBook(id: Long)
 
+    @Query("UPDATE word_book SET name=:name, purpose=:purpose, dailyGoal=:dailyGoal WHERE id=:id")
+    suspend fun updateBook(id: Long, name: String, purpose: String, dailyGoal: Int)
+
     @Query("SELECT * FROM word_entry WHERE bookId = :bookId ORDER BY createdAt ASC")
     fun observeEntries(bookId: Long): Flow<List<WordEntryEntity>>
 
@@ -202,6 +205,9 @@ interface WordBookDao {
 
     @Query("DELETE FROM word_entry WHERE id = :id")
     suspend fun deleteEntry(id: Long)
+
+    @Query("UPDATE word_entry SET english=:english, chinese=:chinese, note=:note WHERE id=:id")
+    suspend fun updateEntry(id: Long, english: String, chinese: String, note: String)
 
     /** 测试自评后更新熟练度。 */
     @Query("UPDATE word_entry SET proficiency = :proficiency, lastSeenAt = :seenAt WHERE id = :id")
