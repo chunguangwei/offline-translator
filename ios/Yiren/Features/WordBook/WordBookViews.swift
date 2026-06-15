@@ -214,6 +214,7 @@ struct ImportWordBookView: View {
     @State private var purpose = ""
     @State private var dailyGoal = 10
     @State private var showFile = false
+    @State private var showDiscardConfirm = false
     @FocusState private var editorFocused: Bool
 
     private var zh: Bool { PromptTemplates.isZhUi }
@@ -303,8 +304,8 @@ struct ImportWordBookView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(zh ? "取消" : "Cancel") {
-                        extractor.reset()
-                        dismiss()
+                        if !extractor.drafts.isEmpty { showDiscardConfirm = true }
+                        else { extractor.reset(); dismiss() }
                     }
                 }
                 // 主操作放 toolbar：始终可见、不被内容挤出屏幕。
@@ -338,7 +339,17 @@ struct ImportWordBookView: View {
                 }
             }
         }
-        .interactiveDismissDisabled(extractor.isExtracting)
+        .interactiveDismissDisabled(extractor.isExtracting || !extractor.drafts.isEmpty)
+        .confirmationDialog(
+            zh ? "丢弃提取结果？" : "Discard extracted words?",
+            isPresented: $showDiscardConfirm, titleVisibility: .visible
+        ) {
+            Button(zh ? "丢弃" : "Discard", role: .destructive) { extractor.reset(); dismiss() }
+            Button(zh ? "继续提取" : "Keep", role: .cancel) {}
+        } message: {
+            Text(zh ? "有 \(extractor.drafts.count) 个已提取但未保存的词，丢弃后需重新提取。"
+                    : "\(extractor.drafts.count) extracted word(s) aren't saved yet. Discarding will require re-extracting.")
+        }
     }
 
     /// 读导入文件为纯文本：RTF 提取纯文字；其余按 UTF-8（失败再兜底其它编码）。
@@ -722,6 +733,7 @@ struct AddWordsView: View {
     // 提取模式
     @State private var text = ""
     @State private var showFile = false
+    @State private var showDiscardConfirm = false
     @FocusState private var editorFocused: Bool
 
     // 手动模式
@@ -755,8 +767,8 @@ struct AddWordsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(zh ? "取消" : "Cancel") {
-                        extractor.reset()
-                        dismiss()
+                        if !extractor.drafts.isEmpty { showDiscardConfirm = true }
+                        else { extractor.reset(); dismiss() }
                     }
                 }
                 ToolbarItemGroup(placement: .keyboard) {
@@ -775,7 +787,17 @@ struct AddWordsView: View {
                 }
             }
         }
-        .interactiveDismissDisabled(extractor.isExtracting)
+        .interactiveDismissDisabled(extractor.isExtracting || !extractor.drafts.isEmpty)
+        .confirmationDialog(
+            zh ? "丢弃提取结果？" : "Discard extracted words?",
+            isPresented: $showDiscardConfirm, titleVisibility: .visible
+        ) {
+            Button(zh ? "丢弃" : "Discard", role: .destructive) { extractor.reset(); dismiss() }
+            Button(zh ? "继续提取" : "Keep", role: .cancel) {}
+        } message: {
+            Text(zh ? "有 \(extractor.drafts.count) 个已提取但未保存的词，丢弃后需重新提取。"
+                    : "\(extractor.drafts.count) extracted word(s) aren't saved yet. Discarding will require re-extracting.")
+        }
     }
 
     @ViewBuilder private var extractSection: some View {
