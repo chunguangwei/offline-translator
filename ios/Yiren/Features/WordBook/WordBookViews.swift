@@ -437,11 +437,15 @@ struct WordBookDetailView: View {
                     } label: {
                         Label(zh ? "添加词" : "Add words", systemImage: "plus.circle")
                     }
+                    // List 行内多个默认样式按钮会被当作整行单一点击目标（点任意一个都触发第一个）。
+                    // 显式 buttonStyle 让它们成为各自独立的点击目标。
+                    .buttonStyle(.bordered)
                     Button {
                         showDedupConfirm = true
                     } label: {
                         Label(zh ? "去重" : "Deduplicate", systemImage: "arrow.triangle.merge")
                     }
+                    .buttonStyle(.bordered)
                     .disabled(book.entries.isEmpty)
                 }
             } footer: {
