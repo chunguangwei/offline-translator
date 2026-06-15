@@ -124,9 +124,12 @@ class WordBookViewModel @Inject constructor(
             }
             _import.update { it.copy(loadingModel = false) }
 
+            // 按模型上下文窗口定分块预算：取窗口的 ~1/5 字符，给提示词与输出留足余量
+            // （最坏 ~1.4 token/字也不会撑爆 maxTokens；4096 → ~819 字/块）。
+            val budget = (engine.activeContextTokens() / 5).coerceIn(400, 1600)
             val seen = LinkedHashMap<String, VocabDraft>() // key=english 小写，保持出现顺序
             try {
-                for (chunk in chunked(text)) {
+                for (chunk in chunked(text, budget)) {
                     val sb = StringBuilder()
                     // 提取是确定性任务（照搬词表、补释义），低温防止乱编/漏词，与 iOS 对齐。
                     engine.generateStream(PromptTemplates.extractVocab(chunk), temperature = 0.2f).collect { token ->
@@ -334,16 +337,20 @@ class WordBookViewModel @Inject constructor(
 
     // ── util ──
 
-    private fun chunked(text: String, size: Int = 1200): List<String> {
-        val lines = text.lines()
+    private fun chunked(text: String, size: Int = 1000): List<String> {
         val chunks = mutableListOf<String>()
         val cur = StringBuilder()
-        for (line in lines) {
-            if (cur.length + line.length + 1 > size && cur.isNotEmpty()) {
-                chunks.add(cur.toString())
-                cur.clear()
+        for (rawLine in text.lines()) {
+            // 单行超长时先在行内按 size 字符硬切，保证没有任何片段超预算
+            // （根治"整段无换行 → 一行喂爆上下文窗口"）。
+            val pieces = if (rawLine.length <= size) listOf(rawLine) else rawLine.chunked(size)
+            for (piece in pieces) {
+                if (cur.length + piece.length + 1 > size && cur.isNotEmpty()) {
+                    chunks.add(cur.toString())
+                    cur.clear()
+                }
+                cur.appendLine(piece)
             }
-            cur.appendLine(line)
         }
         if (cur.isNotBlank()) chunks.add(cur.toString())
         return chunks

@@ -108,6 +108,12 @@ class GemmaEngine @Inject constructor(
     /** Whether the currently-loaded engine can accept audio input. */
     fun isAudioEnabled(): Boolean = audioEnabled
 
+    /** 当前激活模型的上下文窗口（token 上限），供分块/预算用。 */
+    suspend fun activeContextTokens(): Int {
+        val activeId = prefs.flow.first().activeModelId ?: ModelRegistry.DEFAULT.id
+        return (ModelRegistry.byId(activeId) ?: ModelRegistry.DEFAULT).maxTokens
+    }
+
     suspend fun ensureLoaded(): Result<ModelInfo> = mutex.withLock {
         // 一次性快照偏好：activeModelId 与 backend 必须读同一份，否则两次采样之间
         // 用户改了设置会读到不一致组合。

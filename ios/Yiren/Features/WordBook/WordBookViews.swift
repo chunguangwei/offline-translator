@@ -43,10 +43,14 @@ final class VocabExtractor: ObservableObject {
                 return
             }
             loadingModel = false
+            // 按模型上下文窗口定分块预算：取窗口的 ~1/5 字符，给提示词与输出留足余量
+            // （最坏 ~1.4 token/字也不会撑爆 maxTokens；4096 → ~819 字/块）。
+            let ctx = (ModelRegistry.byId(ModelStorage.shared.activeModelId) ?? ModelRegistry.defaultModel).maxTokens
+            let budget = min(1600, max(400, ctx / 5))
             var seen: [String: VocabDraft] = [:]
             var order: [String] = []
             do {
-                for chunk in Self.chunked(text) {
+                for chunk in Self.chunked(text, size: budget) {
                     if Task.isCancelled { break }
                     let stream = try await gemma.generateStream(
                         prompt: PromptTemplates.extractVocab(chunk),
@@ -93,15 +97,30 @@ final class VocabExtractor: ObservableObject {
         errorMessage = nil
     }
 
-    nonisolated static func chunked(_ text: String, size: Int = 1200) -> [String] {
+    nonisolated static func chunked(_ text: String, size: Int = 1000) -> [String] {
         var chunks: [String] = []
         var cur = ""
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            if cur.count + line.count + 1 > size, !cur.isEmpty {
-                chunks.append(cur)
-                cur = ""
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            // 单行超长时先在行内按 size 字符硬切，保证没有任何片段超预算
+            // （根治"整段无换行 → 一行喂爆上下文窗口"）。
+            var pieces: [Substring] = []
+            if rawLine.count <= size {
+                pieces = [rawLine]
+            } else {
+                var idx = rawLine.startIndex
+                while idx < rawLine.endIndex {
+                    let end = rawLine.index(idx, offsetBy: size, limitedBy: rawLine.endIndex) ?? rawLine.endIndex
+                    pieces.append(rawLine[idx..<end])
+                    idx = end
+                }
             }
-            cur += line + "\n"
+            for piece in pieces {
+                if cur.count + piece.count + 1 > size, !cur.isEmpty {
+                    chunks.append(cur)
+                    cur = ""
+                }
+                cur += piece + "\n"
+            }
         }
         if !cur.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { chunks.append(cur) }
         return chunks
