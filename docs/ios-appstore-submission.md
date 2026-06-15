@@ -188,6 +188,13 @@ App Store Connect 当前要求至少：
 每组 3–10 张，建议覆盖：翻译页 / 问答页 / 学习（SRS）页 / 单词本详情 / 设置（突出「离线·隐私」）。
 可在 iPhone 真机或模拟器截图（模拟器 ⌘S）。中英两套各一组（文案语言对应）。
 
+✅ **已生成（2026-06-15）**：`docs/appstore-screenshots/`（gitignore，不入库）下中英各 5 张，
+均 **1320×2868（6.9"，iPhone 17 Pro Max）** —— App Store 当前要求一组 6.9" 即覆盖全部 iPhone 机型：
+- 中文：`0X_*_zh.png`（translate/learn/history/chat/settings）
+- 英文：`0X_*_en.png`
+- 翻译主图为**真实离线结果**（你好，世界 → Hello, world）。如需更丰富画面（带词的单词本、有打卡的学习页），
+  可在已备好的模拟器里手动造数据后补拍，或加文字标题做成市场图。
+
 ---
 
 ## 11. 提交前待办清单（Checklist）
@@ -197,7 +204,7 @@ App Store Connect 当前要求至少：
 - [x] **隐私政策托管** ✅：已发布到 GitHub Pages →
       https://chunguangwei.github.io/offline-translator/privacy/ （源文件 `docs/privacy/index.html`）
 - [x] **PrivacyInfo.xcprivacy** ✅ 已加入工程并验证进包（`ios/Yiren/PrivacyInfo.xcprivacy`）
-- [ ] **截图**制作（见上，中英各一套）—— 需 6.9"/6.5" 模拟器，详见第 10 节
+- [x] **截图** ✅ 中英各 5 张 1320×2868 已生成于 `docs/appstore-screenshots/`（详见第 10 节；可按需补拍/做市场图）
 - [x] **App 图标** 1024 已就位（Assets.xcassets/AppIcon，无 alpha、无圆角）
 - [ ] **Archive 上传**：账号生效后跑 `cd ios && ./archive-appstore.sh`（脚本 + `ExportOptions-appstore.plist`
       已备好），或 Xcode GUI Distribute → App Store Connect。**前提：付费账号 + Apple Distribution 证书**
