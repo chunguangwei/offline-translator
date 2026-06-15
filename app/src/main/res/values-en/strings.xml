@@ -313,4 +313,11 @@
     <string name="common_size_mb">%1$.1f MB</string>
     <string name="common_size_gb">%1$.2f GB</string>
     <string name="common_progress">%1$d%%</string>
+    <string name="backup_section">Backup &amp; Restore</string>
+    <string name="backup_export">Export backup</string>
+    <string name="backup_restore">Import &amp; restore</string>
+    <string name="backup_hint">Export word books, learning progress, translation/chat and settings to a file; import on a new phone to restore (model files not included).</string>
+    <string name="backup_export_done">Backup exported</string>
+    <string name="backup_restore_done">Restored: %1$d books / %2$d words / %3$d translations / %4$d chats</string>
+    <string name="backup_restore_fail">Could not read backup file</string>
 </resources>
