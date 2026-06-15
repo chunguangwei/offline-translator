@@ -175,6 +175,7 @@ private fun ImportDialog(vm: WordBookViewModel, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var purpose by remember { mutableStateOf("") }
     var dailyGoal by remember { mutableStateOf(10) }
+    var showDiscardConfirm by remember { mutableStateOf(false) }
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -185,7 +186,7 @@ private fun ImportDialog(vm: WordBookViewModel, onDismiss: () -> Unit) {
         }
     }
 
-    Dialog(onDismissRequest = { if (!ui.isExtracting) onDismiss() }) {
+    Dialog(onDismissRequest = { if (!ui.isExtracting && ui.drafts.isEmpty()) onDismiss() }) {
         // 实底卡片：弹窗不透底（玻璃拟态在 Dialog 里会透出下层内容，观感差）。
         androidx.compose.material3.Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -194,11 +195,17 @@ private fun ImportDialog(vm: WordBookViewModel, onDismiss: () -> Unit) {
             tonalElevation = 6.dp,
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    stringResource(R.string.wb_new),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.wb_new),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = {
+                        if (ui.drafts.isNotEmpty()) showDiscardConfirm = true else onDismiss()
+                    }) { Text(stringResource(R.string.wb_cancel_extract)) }
+                }
                 Spacer(Modifier.height(10.dp))
 
                 if (ui.drafts.isEmpty() && !ui.isExtracting) {
@@ -237,7 +244,7 @@ private fun ImportDialog(vm: WordBookViewModel, onDismiss: () -> Unit) {
                                 color = MaterialTheme.colorScheme.primary,
                             )
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = vm::cancelExtract) { Text(stringResource(R.string.practice_close)) }
+                            TextButton(onClick = vm::cancelExtract) { Text(stringResource(R.string.wb_stop_extract)) }
                         }
                     } else {
                         Text(
@@ -301,6 +308,16 @@ private fun ImportDialog(vm: WordBookViewModel, onDismiss: () -> Unit) {
                 }
             }
         }
+    }
+
+    if (showDiscardConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirm = false },
+            title = { Text(stringResource(R.string.wb_discard_title)) },
+            text = { Text(stringResource(R.string.wb_discard_msg, ui.drafts.size)) },
+            confirmButton = { TextButton(onClick = { showDiscardConfirm = false; onDismiss() }) { Text(stringResource(R.string.wb_discard_ok)) } },
+            dismissButton = { TextButton(onClick = { showDiscardConfirm = false }) { Text(stringResource(R.string.wb_discard_cancel)) } },
+        )
     }
 }
 
@@ -549,6 +566,7 @@ private fun AddWordDialog(
     var zh by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var dupError by remember { mutableStateOf(false) }
+    var showDiscardConfirm by remember { mutableStateOf(false) }
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -557,7 +575,7 @@ private fun AddWordDialog(
         scope.launch { vm.readTextFile(uri)?.let { text = it } }
     }
 
-    Dialog(onDismissRequest = { if (!ui.isExtracting) onDismiss() }) {
+    Dialog(onDismissRequest = { if (!ui.isExtracting && ui.drafts.isEmpty()) onDismiss() }) {
         androidx.compose.material3.Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
@@ -565,11 +583,17 @@ private fun AddWordDialog(
             tonalElevation = 6.dp,
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    stringResource(R.string.wb_add_word),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.wb_add_word),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = {
+                        if (ui.drafts.isNotEmpty()) showDiscardConfirm = true else onDismiss()
+                    }) { Text(stringResource(R.string.wb_cancel_extract)) }
+                }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
@@ -621,7 +645,7 @@ private fun AddWordDialog(
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                                 Spacer(Modifier.weight(1f))
-                                TextButton(onClick = vm::cancelExtract) { Text(stringResource(R.string.practice_close)) }
+                                TextButton(onClick = vm::cancelExtract) { Text(stringResource(R.string.wb_stop_extract)) }
                             }
                         } else {
                             Text(
@@ -704,6 +728,16 @@ private fun AddWordDialog(
                 }
             }
         }
+    }
+
+    if (showDiscardConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirm = false },
+            title = { Text(stringResource(R.string.wb_discard_title)) },
+            text = { Text(stringResource(R.string.wb_discard_msg, ui.drafts.size)) },
+            confirmButton = { TextButton(onClick = { showDiscardConfirm = false; onDismiss() }) { Text(stringResource(R.string.wb_discard_ok)) } },
+            dismissButton = { TextButton(onClick = { showDiscardConfirm = false }) { Text(stringResource(R.string.wb_discard_cancel)) } },
+        )
     }
 }
 

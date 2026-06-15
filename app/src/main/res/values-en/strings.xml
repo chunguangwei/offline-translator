@@ -248,6 +248,12 @@
     <string name="wb_extract">Extract</string>
     <string name="wb_extracting">Extracting… %1$d so far</string>
     <string name="wb_extract_done">Done, %1$d entries (remove wrong ones)</string>
+    <string name="wb_stop_extract">Stop</string>
+    <string name="wb_cancel_extract">Cancel</string>
+    <string name="wb_discard_title">Discard extracted words?</string>
+    <string name="wb_discard_msg">%1$d extracted word(s) aren\'t saved yet. Discarding will require re-extracting.</string>
+    <string name="wb_discard_ok">Discard</string>
+    <string name="wb_discard_cancel">Keep</string>
     <string name="wb_name_hint">Word book name (required)</string>
     <string name="wb_purpose_hint">Purpose (optional)</string>
     <string name="wb_daily_goal">Daily goal</string>

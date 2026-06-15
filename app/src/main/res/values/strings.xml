@@ -258,6 +258,12 @@
     <string name="wb_extract">开始提取</string>
     <string name="wb_extracting">AI 提取中… 已提取 %1$d 条</string>
     <string name="wb_extract_done">提取完成，共 %1$d 条（可删除错误项）</string>
+    <string name="wb_stop_extract">停止</string>
+    <string name="wb_cancel_extract">取消</string>
+    <string name="wb_discard_title">丢弃提取结果？</string>
+    <string name="wb_discard_msg">有 %1$d 个已提取但未保存的词，丢弃后需重新提取。</string>
+    <string name="wb_discard_ok">丢弃</string>
+    <string name="wb_discard_cancel">继续提取</string>
     <string name="wb_name_hint">单词本名称（必填）</string>
     <string name="wb_purpose_hint">用途说明（可选，如：考研核心词）</string>
     <string name="wb_daily_goal">每日学习量</string>
