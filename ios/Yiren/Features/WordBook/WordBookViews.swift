@@ -226,6 +226,7 @@ struct ImportWordBookView: View {
                         }
                     }
                 } else {
+                    // 状态条（提取中含停止 / 完成提示）
                     Section {
                         if extractor.isExtracting {
                             HStack {
@@ -240,11 +241,28 @@ struct ImportWordBookView: View {
                                     .font(.caption)
                             }
                         } else {
-                            Text(zh ? "提取完成，共 \(extractor.drafts.count) 条（左滑删错误项）"
+                            Text(zh ? "提取完成，共 \(extractor.drafts.count) 条（下方左滑删错误项）"
                                     : "Done, \(extractor.drafts.count) entries")
                                 .font(.caption)
                                 .foregroundStyle(Color.brandPrimary)
                         }
+                    }
+                    // 保存区放在词条列表之前：单词多也不用拉到底命名/保存。
+                    Section(zh ? "保存" : "Save") {
+                        TextField(zh ? "单词本名称（必填）" : "Name (required)", text: $name)
+                        TextField(zh ? "用途说明（可选）" : "Purpose (optional)", text: $purpose)
+                        Picker(zh ? "每日学习量" : "Daily goal", selection: $dailyGoal) {
+                            ForEach([5, 10, 20, 30], id: \.self) { Text("\($0)").tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        Button(zh ? "保存单词本" : "Save word book") { save() }
+                            .disabled(extractor.isExtracting || extractor.drafts.isEmpty
+                                      || name.trimmingCharacters(in: .whitespaces).isEmpty)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.brandPrimary)
+                    }
+                    // 词条列表放最后（可长，不再挡住保存）
+                    Section(zh ? "已提取 \(extractor.drafts.count) 条" : "\(extractor.drafts.count) entries") {
                         ForEach(extractor.drafts) { d in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(d.english) — \(d.chinese)").font(.subheadline)
@@ -259,19 +277,6 @@ struct ImportWordBookView: View {
                             }
                         }
                     }
-                    Section(zh ? "保存" : "Save") {
-                        TextField(zh ? "单词本名称（必填）" : "Name (required)", text: $name)
-                        TextField(zh ? "用途说明（可选）" : "Purpose (optional)", text: $purpose)
-                        Picker(zh ? "每日学习量" : "Daily goal", selection: $dailyGoal) {
-                            ForEach([5, 10, 20, 30], id: \.self) { Text("\($0)").tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        Button(zh ? "保存单词本" : "Save word book") { save() }
-                            .disabled(extractor.isExtracting || extractor.drafts.isEmpty
-                                      || name.trimmingCharacters(in: .whitespaces).isEmpty)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.brandPrimary)
-                    }
                 }
             }
             .navigationTitle(zh ? "新建单词本" : "New word book")
@@ -283,12 +288,18 @@ struct ImportWordBookView: View {
                         dismiss()
                     }
                 }
-                // 主操作放 toolbar：文字再长「提取」也始终可见、不被内容挤出屏幕。
+                // 主操作放 toolbar：始终可见、不被内容挤出屏幕。
+                // 输入阶段=提取；提取完成=保存（滚到词条列表里也点得到）。
                 ToolbarItem(placement: .topBarTrailing) {
                     if extractor.drafts.isEmpty && !extractor.isExtracting {
                         Button(zh ? "提取" : "Extract") { extractor.extract(text) }
                             .fontWeight(.semibold)
                             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } else if !extractor.isExtracting {
+                        Button(zh ? "保存" : "Save") { save() }
+                            .fontWeight(.semibold)
+                            .disabled(extractor.drafts.isEmpty
+                                      || name.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
                 // 键盘上方「完成」收起键盘（多行输入框点别处不一定收起）。
