@@ -111,7 +111,7 @@ offline translator,translate,english,dictionary,AI,vocabulary,flashcards,SRS,voi
 |---|---|---|
 | **支持 URL Support URL** | https://github.com/chunguangwei/offline-translator | 必填。可后续换成专门支持页 |
 | **营销 URL Marketing URL** | （可留空） | 选填 |
-| **隐私政策 URL Privacy Policy** | 见下「待办」——需托管 `docs/隐私政策-privacy-policy.md` | **必填** |
+| **隐私政策 URL Privacy Policy** | **https://chunguangwei.github.io/offline-translator/privacy/** ✅ 已上线 | **必填** |
 
 ---
 
@@ -167,6 +167,15 @@ offline translator,translate,english,dictionary,AI,vocabulary,flashcards,SRS,voi
 > 备选：若审核因「需下载大模型才能测试」受阻，启用工程里的 `BundledModels/` 随包机制做一个
 > **审核专用构建**（模型随包，reviewer 开箱即用），上架后再切回按需下载。
 
+**归档/上传脚本已备好**（账号生效后一条命令）：
+- 正式版（不随包模型）：`cd ios && ./archive-appstore.sh`
+- 审核专用（随包 2.4G 模型，reviewer 开箱即用）：`cd ios && ./archive-appstore.sh --bundle-model`
+- 导出配置：`ios/ExportOptions-appstore.plist`（teamID L35RLT89XN，自动签名）。
+- ⚠️ **签名前提**：当前钥匙串只有「Apple Development」「Developer ID」证书，**缺「Apple Distribution」**。
+  归档导出 App Store 包必须先有**付费 Apple Developer Program 账号** + Xcode 登录该账号，
+  自动签名（`-allowProvisioningUpdates`）才能拉到 Distribution 证书与 App Store 描述文件。
+  上传用 Transporter.app 或 `xcrun altool --upload-app`（需 app 专用密码 / API key）。
+
 ---
 
 ## 10. 截图 Screenshots（待制作）
@@ -185,13 +194,13 @@ App Store Connect 当前要求至少：
 
 - [ ] **付费开发者账号生效**（个人/公司 Apple Developer Program，$99/年）——TestFlight 与上架前提
 - [ ] **中国区软著**：中国区提交需「计算机软件著作权登记证书」（约 30 天，可加急）。海外区不需要
-- [ ] **隐私政策托管**：把 `docs/隐私政策-privacy-policy.md` 发布为可访问网页
-      （GitHub Pages，或 raw 链接），URL 填进 App Store Connect
-- [ ] **PrivacyInfo.xcprivacy** 已加入工程 → 重跑 `xcodegen generate` 后 Archive 时确认进包
-- [ ] **截图**制作（见上，中英各一套）
-- [ ] **App 图标** 1024 已就位（Assets.xcassets/AppIcon，无 alpha、无圆角）
-- [ ] **Archive 上传**：`xcodebuild archive` + `exportArchive`（参考 ImagePilot 的 ios-archive-adhoc.sh /
-      ExportOptions），或 Xcode GUI Distribute → App Store Connect
+- [x] **隐私政策托管** ✅：已发布到 GitHub Pages →
+      https://chunguangwei.github.io/offline-translator/privacy/ （源文件 `docs/privacy/index.html`）
+- [x] **PrivacyInfo.xcprivacy** ✅ 已加入工程并验证进包（`ios/Yiren/PrivacyInfo.xcprivacy`）
+- [ ] **截图**制作（见上，中英各一套）—— 需 6.9"/6.5" 模拟器，详见第 10 节
+- [x] **App 图标** 1024 已就位（Assets.xcassets/AppIcon，无 alpha、无圆角）
+- [ ] **Archive 上传**：账号生效后跑 `cd ios && ./archive-appstore.sh`（脚本 + `ExportOptions-appstore.plist`
+      已备好），或 Xcode GUI Distribute → App Store Connect。**前提：付费账号 + Apple Distribution 证书**
 - [ ] **构建版本号**：MARKETING_VERSION 1.0.6 / CURRENT_PROJECT_VERSION 递增（每次上传 build 号要+1）
 - [ ] 在 App Store Connect 填入本文第 1–9 节内容，绑定截图与构建，提交审核
 
