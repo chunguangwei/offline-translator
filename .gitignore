@@ -69,4 +69,4 @@ Thumbs.db
 /ios/*.xcworkspace
 /ios/BundledModels/*
 !/ios/BundledModels/.gitkeep
-docs/appstore-screenshots/
+appstore-screenshots/
