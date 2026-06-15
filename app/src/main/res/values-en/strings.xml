@@ -261,6 +261,18 @@
     <string name="wb_dir_mixed">Mixed</string>
     <string name="wb_reveal">Got it in mind? Tap to reveal</string>
     <string name="wb_quiz_done">All %1$d cards cleared\n%2$d on first try</string>
+    <string name="wb_edit_book">Edit word book</string>
+    <string name="wb_add_word">Add words</string>
+    <string name="wb_add_extract">Extract</string>
+    <string name="wb_add_manual">Manual</string>
+    <string name="wb_add_to_book">Save to book</string>
+    <string name="wb_field_en">English</string>
+    <string name="wb_field_zh">Chinese</string>
+    <string name="wb_field_note">Note (optional)</string>
+    <string name="wb_add_dup">Word already exists, or English/Chinese is empty</string>
+    <string name="wb_edit_entry">Edit entry</string>
+    <string name="wb_edit_save">Save</string>
+    <string name="wb_edit_delete">Delete</string>
 
     <!-- About / License -->
     <string name="settings_about">About &amp; License</string>
