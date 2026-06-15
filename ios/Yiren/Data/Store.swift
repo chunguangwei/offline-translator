@@ -54,6 +54,8 @@ final class TranslationRecord {
     var createdAt: Date
     /** 收藏进生词本（单词练习用）。带默认值，SwiftData 轻量迁移自动处理。 */
     var starred: Bool = false
+    /** SRS 跨表稳定 id（ReviewCard.sourceId 引用）。带默认值，轻量迁移自动填充。 */
+    var uid: String = UUID().uuidString
 
     init(sourceText: String, translatedText: String,
          sourceLang: String, targetLang: String, createdAt: Date = .now,
@@ -97,6 +99,8 @@ final class WordEntry {
     var lastSeenAt: Date = Date.distantPast
     var createdAt: Date
     var book: WordBook?
+    /** SRS 跨表稳定 id（ReviewCard.sourceId 引用）。带默认值，轻量迁移自动填充。 */
+    var uid: String = UUID().uuidString
 
     init(english: String, chinese: String, note: String = "", createdAt: Date = .now) {
         self.english = english
@@ -106,13 +110,33 @@ final class WordEntry {
     }
 }
 
+/// SRS 调度卡（对应 Android ReviewCardEntity）。sourceType: "WORD_ENTRY" | "STARRED"。
+/// sourceId = 源记录(WordEntry/TranslationRecord)的 uid。内容不存这里，按 uid 回查源行。
+@Model
+final class ReviewCard {
+    var sourceType: String
+    var sourceId: String
+    var box: Int = 0
+    var dueAt: Int64 = 0
+    var missCount: Int = 0
+    var lastReviewedAt: Int64 = 0
+    var createdAt: Date
+
+    init(sourceType: String, sourceId: String, box: Int = 0, dueAt: Int64 = 0,
+         missCount: Int = 0, lastReviewedAt: Int64 = 0, createdAt: Date = .now) {
+        self.sourceType = sourceType; self.sourceId = sourceId
+        self.box = box; self.dueAt = dueAt; self.missCount = missCount
+        self.lastReviewedAt = lastReviewedAt; self.createdAt = createdAt
+    }
+}
+
 /// 共享容器：App 与 ViewModel 都从这里拿主线程 context。
 enum DataStore {
     static let container: ModelContainer = {
         do {
             return try ModelContainer(
                 for: ChatSession.self, ChatMessage.self, TranslationRecord.self,
-                WordBook.self, WordEntry.self
+                WordBook.self, WordEntry.self, ReviewCard.self
             )
         } catch {
             fatalError("SwiftData container init failed: \(error)")

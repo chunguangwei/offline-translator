@@ -237,6 +237,15 @@
     <string name="practice_know">认识</string>
     <string name="practice_done">本轮全部记住了！</string>
     <string name="practice_close">完成</string>
+    <string name="srs_streak">🔥 连续 %1$d 天</string>
+    <string name="srs_today_due">今日到期 %1$d 张</string>
+    <string name="srs_start_review">开始复习</string>
+    <string name="srs_all_clear">今日已清空 🎉</string>
+    <string name="srs_session_summary">今日复习 %1$d 张</string>
+    <string name="srs_hard_tab">错题本</string>
+    <string name="srs_hard_count">%1$d 个难词</string>
+    <string name="srs_hard_practice">只练错题本</string>
+    <string name="srs_hard_empty">还没有难词，继续保持 👍</string>
 
     <!-- 单词本 -->
     <string name="wb_tab">单词本</string>
@@ -254,6 +263,8 @@
     <string name="wb_daily_goal">每日学习量</string>
     <string name="wb_save">保存单词本</string>
     <string name="wb_study_today">今日学习</string>
+    <string name="wb_review_due">今日复习</string>
+    <string name="wb_stats_srs">%1$d 词 · 已掌握 %2$d · 今日到期 %3$d</string>
     <string name="wb_quiz_all">全量抽查</string>
     <string name="wb_dir_zh2en">中→英</string>
     <string name="wb_dir_en2zh">英→中</string>
@@ -282,6 +293,12 @@
     <string name="update_install">立即安装</string>
     <string name="update_later">稍后</string>
     <string name="update_failed">更新失败：%1$s</string>
+
+    <!-- SRS daily review reminder -->
+    <string name="srs_reminder_title">每日复习提醒</string>
+    <string name="srs_reminder_desc">到点提醒你复习到期单词（纯本地，不联网）</string>
+    <string name="srs_reminder_time">提醒时间</string>
+    <string name="srs_reminder_body">📚 你有 %1$d 张单词待复习</string>
 
     <!-- Common -->
     <string name="common_ok">确定</string>

@@ -227,6 +227,15 @@
     <string name="practice_know">Got it</string>
     <string name="practice_done">All done for this round!</string>
     <string name="practice_close">Done</string>
+    <string name="srs_streak">🔥 %1$d-day streak</string>
+    <string name="srs_today_due">%1$d due today</string>
+    <string name="srs_start_review">Start review</string>
+    <string name="srs_all_clear">All clear today 🎉</string>
+    <string name="srs_session_summary">Reviewed %1$d today</string>
+    <string name="srs_hard_tab">Hard words</string>
+    <string name="srs_hard_count">%1$d hard words</string>
+    <string name="srs_hard_practice">Practice hard words</string>
+    <string name="srs_hard_empty">No hard words yet — keep it up 👍</string>
 
     <!-- Word books -->
     <string name="wb_tab">Word books</string>
@@ -244,6 +253,8 @@
     <string name="wb_daily_goal">Daily goal</string>
     <string name="wb_save">Save word book</string>
     <string name="wb_study_today">Study today</string>
+    <string name="wb_review_due">Review due</string>
+    <string name="wb_stats_srs">%1$d words · %2$d mastered · %3$d due today</string>
     <string name="wb_quiz_all">Random quiz (all)</string>
     <string name="wb_dir_zh2en">ZH→EN</string>
     <string name="wb_dir_en2zh">EN→ZH</string>
@@ -276,6 +287,11 @@
     <string name="common_ok">OK</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_back">Back</string>
+    <string name="srs_reminder_title">Daily review reminder</string>
+    <string name="srs_reminder_desc">Local reminder to review due words (offline)</string>
+    <string name="srs_reminder_time">Reminder time</string>
+    <string name="srs_reminder_body">📚 %1$d words due for review</string>
+
     <string name="common_retry">Retry</string>
     <string name="common_loading">Loading…</string>
     <string name="common_empty">Nothing here</string>

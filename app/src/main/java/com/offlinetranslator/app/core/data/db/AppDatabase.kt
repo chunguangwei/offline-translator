@@ -106,6 +106,12 @@ interface TranslationDao {
     @Query("UPDATE translation_history SET starred = :starred WHERE id = :id")
     suspend fun setStarred(id: Long, starred: Boolean)
 
+    @Query("SELECT * FROM translation_history WHERE starred = 1")
+    suspend fun starredOnce(): List<TranslationEntity>
+
+    @Query("SELECT * FROM translation_history WHERE id = :id")
+    suspend fun recordById(id: Long): TranslationEntity?
+
     @Query("DELETE FROM translation_history WHERE id = :id")
     suspend fun delete(id: Long)
 
@@ -185,6 +191,9 @@ interface WordBookDao {
     @Query("SELECT * FROM word_entry WHERE bookId = :bookId")
     suspend fun entriesOnce(bookId: Long): List<WordEntryEntity>
 
+    @Query("SELECT * FROM word_entry WHERE id = :id")
+    suspend fun entryById(id: Long): WordEntryEntity?
+
     @Insert
     suspend fun insertEntries(entries: List<WordEntryEntity>)
 
@@ -224,16 +233,82 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/** v5→v6：新增 SRS 调度表 review_card。 */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS review_card (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "sourceType TEXT NOT NULL, sourceId INTEGER NOT NULL, " +
+                "box INTEGER NOT NULL, dueAt INTEGER NOT NULL, " +
+                "missCount INTEGER NOT NULL, lastReviewedAt INTEGER NOT NULL, " +
+                "createdAt INTEGER NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_review_card_sourceType_sourceId " +
+                "ON review_card (sourceType, sourceId)"
+        )
+    }
+}
+
+/** SRS 调度卡：来源=单词本词条 或 生词本星标。内容不存这里，按 sourceId 回查源行。 */
+@Entity(
+    tableName = "review_card",
+    indices = [androidx.room.Index(value = ["sourceType", "sourceId"], unique = true)],
+)
+data class ReviewCardEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val sourceType: String,   // "WORD_ENTRY" | "STARRED"
+    val sourceId: Long,
+    val box: Int = 0,
+    val dueAt: Long = 0,
+    val missCount: Int = 0,
+    val lastReviewedAt: Long = 0,
+    val createdAt: Long,
+)
+
+@Dao
+interface ReviewCardDao {
+    @Query("SELECT * FROM review_card")
+    suspend fun all(): List<ReviewCardEntity>
+
+    @Query("SELECT * FROM review_card WHERE sourceType = :type")
+    suspend fun byType(type: String): List<ReviewCardEntity>
+
+    @Query("SELECT COUNT(*) FROM review_card WHERE dueAt <= :now AND (box >= 1 OR lastReviewedAt > 0)")
+    suspend fun countOverdue(now: Long): Int
+
+    @Query("SELECT * FROM review_card WHERE missCount >= :threshold ORDER BY missCount DESC")
+    suspend fun hardCards(threshold: Int): List<ReviewCardEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(cards: List<ReviewCardEntity>)
+
+    @Query("UPDATE review_card SET box=:box, dueAt=:dueAt, missCount=:miss, lastReviewedAt=:last WHERE id=:id")
+    suspend fun updateState(id: Long, box: Int, dueAt: Long, miss: Int, last: Long)
+
+    @Query("DELETE FROM review_card WHERE sourceType=:type AND sourceId=:sourceId")
+    suspend fun deleteBySource(type: String, sourceId: Long)
+
+    @Query("DELETE FROM review_card WHERE sourceType=:type AND sourceId IN (:ids)")
+    suspend fun deleteBySourceIds(type: String, ids: List<Long>)
+
+    @Query("DELETE FROM review_card WHERE sourceType = :type")
+    suspend fun deleteByType(type: String)
+}
+
 @Database(
     entities = [
         ChatSessionEntity::class, ChatMessageEntity::class, TranslationEntity::class,
         WordBookEntity::class, WordEntryEntity::class,
+        ReviewCardEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
     abstract fun translationDao(): TranslationDao
     abstract fun wordBookDao(): WordBookDao
+    abstract fun reviewCardDao(): ReviewCardDao
 }

@@ -39,6 +39,8 @@ struct HistoryView: View {
                                     Button {
                                         r.starred.toggle()
                                         try? context.save()
+                                        if r.starred { SrsStore.addCard(context, sourceType: "STARRED", sourceId: r.uid) }
+                                        else { SrsStore.removeCard(context, sourceType: "STARRED", sourceId: r.uid) }
                                     } label: {
                                         Image(systemName: r.starred ? "star.fill" : "star")
                                             .foregroundStyle(r.starred ? Color.brandPrimary : Color.secondary)
@@ -56,6 +58,7 @@ struct HistoryView: View {
                             .padding(.vertical, 4)
                             .swipeActions {
                                 Button(role: .destructive) {
+                                    SrsStore.removeCard(context, sourceType: "STARRED", sourceId: r.uid)
                                     context.delete(r)
                                     try? context.save()
                                 } label: { Label(zh ? "删除" : "Delete", systemImage: "trash") }
@@ -72,6 +75,7 @@ struct HistoryView: View {
                 if !records.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(zh ? "清空" : "Clear", role: .destructive) {
+                            SrsStore.removeAll(context, sourceType: "STARRED")
                             for r in records { context.delete(r) }
                             try? context.save()
                         }

@@ -1,5 +1,9 @@
 package com.offlinetranslator.app.feature.settings
 
+import android.app.TimePickerDialog
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,13 +22,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -37,6 +44,8 @@ import com.offlinetranslator.app.core.data.ModelSource
 import com.offlinetranslator.app.core.designsystem.components.GlassCard
 import com.offlinetranslator.app.core.designsystem.theme.ThemeMode
 import com.offlinetranslator.app.core.i18n.AppLanguage
+import com.offlinetranslator.app.feature.learn.cancelDaily
+import com.offlinetranslator.app.feature.learn.scheduleDaily
 import com.offlinetranslator.app.feature.update.UpdateDialogHost
 import com.offlinetranslator.app.feature.update.UpdateUiState
 import com.offlinetranslator.app.feature.update.UpdateViewModel
@@ -53,6 +62,27 @@ fun SettingsScreen(
     val updateVm: UpdateViewModel = hiltViewModel()
     val updateState by updateVm.ui.collectAsStateWithLifecycle()
     UpdateDialogHost(updateVm)
+
+    val context = LocalContext.current
+
+    // On Android 13+ enabling the reminder requires the POST_NOTIFICATIONS
+    // runtime permission. We persist + schedule regardless of the result so the
+    // toggle reflects user intent; if denied, the worker simply skips posting.
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { _ ->
+        vm.setReminder(true, state.reminderHour, state.reminderMinute)
+        scheduleDaily(context, state.reminderHour, state.reminderMinute)
+    }
+
+    fun enableReminder() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            vm.setReminder(true, state.reminderHour, state.reminderMinute)
+            scheduleDaily(context, state.reminderHour, state.reminderMinute)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -105,6 +135,63 @@ fun SettingsScreen(
                     onClick = { vm.setLanguage(AppLanguage.EN) },
                     label = { Text(stringResource(R.string.lang_en)) },
                 )
+            }
+        }
+
+        SettingSection(title = stringResource(R.string.srs_reminder_title)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.srs_reminder_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                )
+                Switch(
+                    checked = state.reminderEnabled,
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            enableReminder()
+                        } else {
+                            vm.setReminder(false, state.reminderHour, state.reminderMinute)
+                            cancelDaily(context)
+                        }
+                    },
+                )
+            }
+            if (state.reminderEnabled) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            TimePickerDialog(
+                                context,
+                                { _, h, m ->
+                                    vm.setReminder(true, h, m)
+                                    scheduleDaily(context, h, m)
+                                },
+                                state.reminderHour,
+                                state.reminderMinute,
+                                true,
+                            ).show()
+                        },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.srs_reminder_time),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = String.format("%02d:%02d", state.reminderHour, state.reminderMinute),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
 

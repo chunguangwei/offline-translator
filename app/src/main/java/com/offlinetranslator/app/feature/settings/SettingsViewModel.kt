@@ -47,4 +47,11 @@ class SettingsViewModel @Inject constructor(
         engine.unload()
     }
     fun setCustomMirrorBase(url: String) = viewModelScope.launch { prefs.setCustomMirrorBase(url) }
+
+    /** Persist the daily-review-reminder preference. Scheduling/cancelling the
+     *  WorkManager job is done on the UI side (it needs an Activity Context for
+     *  the permission flow). */
+    fun setReminder(enabled: Boolean, hour: Int, minute: Int) = viewModelScope.launch {
+        prefs.setReminder(enabled, hour, minute)
+    }
 }

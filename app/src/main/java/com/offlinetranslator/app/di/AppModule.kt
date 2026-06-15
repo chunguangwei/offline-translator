@@ -8,6 +8,7 @@ import com.offlinetranslator.app.core.data.db.MIGRATION_1_2
 import com.offlinetranslator.app.core.data.db.MIGRATION_2_3
 import com.offlinetranslator.app.core.data.db.MIGRATION_3_4
 import com.offlinetranslator.app.core.data.db.MIGRATION_4_5
+import com.offlinetranslator.app.core.data.db.MIGRATION_5_6
 import com.offlinetranslator.app.core.data.db.TranslationDao
 import dagger.Module
 import dagger.Provides
@@ -26,7 +27,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "offline_translator.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             // 只在【降级】时允许销毁重建；正常升级必须靠上面的迁移链。
             // 用全量 destructive 会在某次漏写迁移时静默清空用户会话/历史/单词本——
             // 宁可升级崩溃暴露问题，也不能无声丢用户数据。
@@ -41,6 +42,11 @@ object AppModule {
 
     @Provides
     fun provideWordBookDao(db: AppDatabase): com.offlinetranslator.app.core.data.db.WordBookDao = db.wordBookDao()
+
+    @Provides
+    @Singleton
+    fun provideReviewCardDao(db: AppDatabase): com.offlinetranslator.app.core.data.db.ReviewCardDao =
+        db.reviewCardDao()
 
     @Provides
     @Singleton

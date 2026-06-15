@@ -5,6 +5,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.offlinetranslator.app.core.designsystem.theme.ThemeMode
@@ -32,6 +34,13 @@ data class AppPreferences(
     val customMirrorBase: String = "",
     /** 问答角色预设 id（default/translator/grammar/polish/speaking），见 PromptTemplates.chatSystem。 */
     val chatRole: String = "default",
+    val streakLastDay: Long = 0,
+    val streakCurrent: Int = 0,
+    val streakLongest: Int = 0,
+    val reminderEnabled: Boolean = false,
+    val reminderHour: Int = 20,
+    val reminderMinute: Int = 0,
+    val srsBackfilled: Boolean = false,
 )
 
 @Singleton
@@ -48,6 +57,13 @@ class AppPreferencesRepository @Inject constructor(
         val FIRST = booleanPreferencesKey("first_launch")
         val CUSTOM_MIRROR = stringPreferencesKey("custom_mirror_base")
         val CHAT_ROLE = stringPreferencesKey("chat_role")
+        val STREAK_LAST_DAY = longPreferencesKey("streak_last_day")
+        val STREAK_CURRENT = intPreferencesKey("streak_current")
+        val STREAK_LONGEST = intPreferencesKey("streak_longest")
+        val REMINDER_ON = booleanPreferencesKey("reminder_enabled")
+        val REMINDER_HOUR = intPreferencesKey("reminder_hour")
+        val REMINDER_MIN = intPreferencesKey("reminder_minute")
+        val SRS_BACKFILLED = booleanPreferencesKey("srs_backfilled")
     }
 
     val flow: Flow<AppPreferences> = context.appDataStore.data.map { prefs ->
@@ -64,6 +80,13 @@ class AppPreferencesRepository @Inject constructor(
             firstLaunch = prefs[Keys.FIRST] ?: true,
             customMirrorBase = prefs[Keys.CUSTOM_MIRROR] ?: "",
             chatRole = prefs[Keys.CHAT_ROLE] ?: "default",
+            streakLastDay = prefs[Keys.STREAK_LAST_DAY] ?: 0,
+            streakCurrent = prefs[Keys.STREAK_CURRENT] ?: 0,
+            streakLongest = prefs[Keys.STREAK_LONGEST] ?: 0,
+            reminderEnabled = prefs[Keys.REMINDER_ON] ?: false,
+            reminderHour = prefs[Keys.REMINDER_HOUR] ?: 20,
+            reminderMinute = prefs[Keys.REMINDER_MIN] ?: 0,
+            srsBackfilled = prefs[Keys.SRS_BACKFILLED] ?: false,
         )
     }
 
@@ -80,4 +103,11 @@ class AppPreferencesRepository @Inject constructor(
         it[Keys.CUSTOM_MIRROR] = url.trim()
     }
     suspend fun setChatRole(role: String) = context.appDataStore.edit { it[Keys.CHAT_ROLE] = role }
+    suspend fun setStreak(lastDay: Long, current: Int, longest: Int) = context.appDataStore.edit {
+        it[Keys.STREAK_LAST_DAY] = lastDay; it[Keys.STREAK_CURRENT] = current; it[Keys.STREAK_LONGEST] = longest
+    }
+    suspend fun setReminder(enabled: Boolean, hour: Int, minute: Int) = context.appDataStore.edit {
+        it[Keys.REMINDER_ON] = enabled; it[Keys.REMINDER_HOUR] = hour; it[Keys.REMINDER_MIN] = minute
+    }
+    suspend fun setSrsBackfilled(v: Boolean) = context.appDataStore.edit { it[Keys.SRS_BACKFILLED] = v }
 }
