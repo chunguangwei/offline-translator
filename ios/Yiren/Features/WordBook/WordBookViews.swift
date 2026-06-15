@@ -369,7 +369,8 @@ struct WordBookDetailView: View {
     let book: WordBook
     @Environment(\.modelContext) private var context
     @State private var direction: QuizDirection = .mixed
-    @State private var quizBatch: [WordEntry]?
+    // 稳定 id 的 payload（不要每次渲染新建 UUID，否则评分 save 触发重渲染会重置队列）。
+    @State private var quizPayload: QuizPayload?
     // 「今日学习」现走 SRS：本册到期卡 → 翻卡 → 认识后隔天才再现（不再原地重复）。
     @State private var srsItems: [SrsStore.ReviewItem] = []
     @State private var showSrsReview = false
@@ -400,7 +401,7 @@ struct WordBookDetailView: View {
                     .disabled(stats.due == 0)
                     // 全量抽查：整本打散纯练手，不改 SRS 进度。
                     Button(zh ? "全量抽查" : "Random quiz") {
-                        quizBatch = book.entries.shuffled()
+                        quizPayload = QuizPayload(batch: book.entries.shuffled(), direction: direction)
                     }
                     .buttonStyle(.bordered)
                     .disabled(book.entries.isEmpty)
@@ -431,10 +432,7 @@ struct WordBookDetailView: View {
         .navigationTitle(book.name)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { refreshStats() }
-        .sheet(item: Binding(
-            get: { quizBatch.map { QuizPayload(batch: $0, direction: direction) } },
-            set: { if $0 == nil { quizBatch = nil } }
-        )) { payload in
+        .sheet(item: $quizPayload) { payload in
             WordQuizView(payload: payload)
         }
         .sheet(isPresented: $showSrsReview, onDismiss: { refreshStats() }) {
