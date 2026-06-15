@@ -40,6 +40,21 @@ fun dedupDrafts(drafts: List<VocabDraft>, existingKeys: Set<String>): List<Vocab
     return out
 }
 
+/** 一行去重输入：词条 id、英文键(已规范化)、SRS box、创建时间。 */
+data class DedupRow(val id: Long, val key: String, val box: Int, val createdAt: Long)
+
+/** 找出单词本内重复英文键应删除的词条 id：每组重复保留 box 最高、并列取 createdAt 最早的一条，其余删除。 */
+fun entriesToRemoveForDedup(rows: List<DedupRow>): Set<Long> {
+    val remove = HashSet<Long>()
+    for ((_, group) in rows.groupBy { it.key }) {
+        if (group.size <= 1) continue
+        // 保留：box 最大；并列时 createdAt 最小（最早）。用 -createdAt 让“更早”在 maxWith 里更大。
+        val keep = group.maxWith(compareBy({ it.box }, { -it.createdAt }))
+        group.forEach { if (it.id != keep.id) remove.add(it.id) }
+    }
+    return remove
+}
+
 data class ImportUi(
     val isExtracting: Boolean = false,
     /** 正在加载模型（首载提示）。 */
@@ -271,6 +286,21 @@ class WordBookViewModel @Inject constructor(
         viewModelScope.launch {
             reviewCardDao.deleteBySource("WORD_ENTRY", id)
             dao.deleteEntry(id)
+        }
+    }
+
+    /** 清理单词本内重复英文词（保留学习进度最高的一条）；回调回传清理掉的条数。 */
+    fun dedupBook(bookId: Long, onResult: (Int) -> Unit) {
+        viewModelScope.launch {
+            val entries = dao.entriesOnce(bookId)
+            val boxBySource = reviewCardDao.byType("WORD_ENTRY").associate { it.sourceId to it.box }
+            val rows = entries.map { DedupRow(it.id, it.english.trim().lowercase(), boxBySource[it.id] ?: 0, it.createdAt) }
+            val toRemove = entriesToRemoveForDedup(rows)
+            if (toRemove.isNotEmpty()) {
+                reviewCardDao.deleteBySourceIds("WORD_ENTRY", toRemove.toList())
+                toRemove.forEach { dao.deleteEntry(it) }
+            }
+            onResult(toRemove.size)
         }
     }
 

@@ -263,6 +263,10 @@
     <string name="wb_quiz_done">All %1$d cards cleared\n%2$d on first try</string>
     <string name="wb_edit_book">Edit word book</string>
     <string name="wb_add_word">Add words</string>
+    <string name="wb_dedup">Deduplicate</string>
+    <string name="wb_dedup_confirm">Merge duplicate English entries in this book, keeping only the one with the most learning progress for each word. Continue?</string>
+    <string name="wb_dedup_done">Removed %1$d duplicate(s)</string>
+    <string name="wb_dedup_none">No duplicates found</string>
     <string name="wb_add_extract">Extract</string>
     <string name="wb_add_manual">Manual</string>
     <string name="wb_add_to_book">Save to book</string>

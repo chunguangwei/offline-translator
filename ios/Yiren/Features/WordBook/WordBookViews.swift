@@ -380,10 +380,31 @@ struct WordBookDetailView: View {
     @State private var showEditBook = false
     @State private var showAddWords = false
     @State private var editingEntry: WordEntry?
+    // 去重：二次确认 + 结果提示。
+    @State private var showDedupConfirm = false
+    @State private var showDedupResult = false
+    @State private var dedupResultMsg = ""
 
     private var zh: Bool { PromptTemplates.isZhUi }
 
     private func refreshStats() { stats = SrsStore.bookStats(context, book) }
+
+    /// 扫描本内重复英文词，每词只保留 SRS box 最高（并列取最早）的一条，删掉其余条及其 ReviewCard。返回删除数。
+    private func dedupBook() -> Int {
+        let type = "WORD_ENTRY"
+        let cards = (try? context.fetch(FetchDescriptor<ReviewCard>(predicate: #Predicate { $0.sourceType == type }))) ?? []
+        let boxByUid = Dictionary(cards.map { ($0.sourceId, $0.box) }, uniquingKeysWith: { a, _ in a })
+        let rows = book.entries.map { DedupRow(id: $0.uid, key: $0.english.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), box: boxByUid[$0.uid] ?? 0, createdAt: $0.createdAt.timeIntervalSince1970) }
+        let toRemove = entriesToRemoveForDedup(rows)
+        if !toRemove.isEmpty {
+            for e in book.entries where toRemove.contains(e.uid) {
+                SrsStore.removeCard(context, sourceType: "WORD_ENTRY", sourceId: e.uid)
+                context.delete(e)
+            }
+            try? context.save()
+        }
+        return toRemove.count
+    }
 
     var body: some View {
         List {
@@ -410,10 +431,18 @@ struct WordBookDetailView: View {
                     .buttonStyle(.bordered)
                     .disabled(book.entries.isEmpty)
                 }
-                Button {
-                    showAddWords = true
-                } label: {
-                    Label(zh ? "添加词" : "Add words", systemImage: "plus.circle")
+                HStack(spacing: 12) {
+                    Button {
+                        showAddWords = true
+                    } label: {
+                        Label(zh ? "添加词" : "Add words", systemImage: "plus.circle")
+                    }
+                    Button {
+                        showDedupConfirm = true
+                    } label: {
+                        Label(zh ? "去重" : "Deduplicate", systemImage: "arrow.triangle.merge")
+                    }
+                    .disabled(book.entries.isEmpty)
                 }
             } footer: {
                 Text(zh ? "\(book.entries.count) 词 · 已掌握 \(stats.mastered) · 今日到期 \(stats.due)"
@@ -466,6 +495,30 @@ struct WordBookDetailView: View {
         }
         .sheet(item: $editingEntry, onDismiss: { refreshStats() }) { entry in
             EditWordEntryView(entry: entry)
+        }
+        .confirmationDialog(
+            zh ? "去重" : "Deduplicate",
+            isPresented: $showDedupConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(zh ? "去重" : "Deduplicate", role: .destructive) {
+                let n = dedupBook()
+                dedupResultMsg = n > 0
+                    ? (zh ? "已清理 \(n) 个重复词" : "Removed \(n) duplicate(s)")
+                    : (zh ? "没有重复词条" : "No duplicates found")
+                showDedupResult = true
+                refreshStats()
+            }
+            Button(zh ? "取消" : "Cancel", role: .cancel) {}
+        } message: {
+            Text(zh
+                 ? "将合并本内重复的英文词条，每个词只保留学习进度最高的一条。继续？"
+                 : "Merge duplicate English entries, keeping the one with the most learning progress for each word. Continue?")
+        }
+        .alert(zh ? "去重" : "Deduplicate", isPresented: $showDedupResult) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(dedupResultMsg)
         }
     }
 }
