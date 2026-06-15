@@ -253,6 +253,8 @@
     <string name="wb_daily_goal">Daily goal</string>
     <string name="wb_save">Save word book</string>
     <string name="wb_study_today">Study today</string>
+    <string name="wb_review_due">Review due</string>
+    <string name="wb_stats_srs">%1$d words · %2$d mastered · %3$d due today</string>
     <string name="wb_quiz_all">Random quiz (all)</string>
     <string name="wb_dir_zh2en">ZH→EN</string>
     <string name="wb_dir_en2zh">EN→ZH</string>

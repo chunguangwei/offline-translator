@@ -51,6 +51,8 @@ import com.offlinetranslator.app.R
 import com.offlinetranslator.app.core.data.db.WordBookEntity
 import com.offlinetranslator.app.core.data.db.WordEntryEntity
 import com.offlinetranslator.app.core.designsystem.components.GlassCard
+import com.offlinetranslator.app.feature.learn.LearnViewModel
+import com.offlinetranslator.app.feature.learn.SrsReviewDialog
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -304,12 +306,21 @@ private fun ImportDialog(vm: WordBookViewModel, onDismiss: () -> Unit) {
 private enum class QuizDirection { ZH2EN, EN2ZH, MIXED }
 
 @Composable
-private fun BookDetail(book: WordBookEntity, onBack: () -> Unit, vm: WordBookViewModel) {
+private fun BookDetail(
+    book: WordBookEntity,
+    onBack: () -> Unit,
+    vm: WordBookViewModel,
+    learnVm: LearnViewModel = hiltViewModel(),
+) {
     val entries by vm.entries(book.id).collectAsStateWithLifecycle()
-    val mastered = entries.count { it.proficiency >= 3 }
     val scope = rememberCoroutineScope()
     var direction by remember { mutableStateOf(QuizDirection.MIXED) }
     var quizBatch by remember { mutableStateOf<List<WordEntryEntity>?>(null) }
+    // SRS：今日复习用单词本的到期卡；掌握标记按 box≥MAX_BOX。
+    var stats by remember { mutableStateOf(LearnViewModel.BookStats(0, 0, emptySet())) }
+    var srsItems by remember { mutableStateOf<List<LearnViewModel.ReviewItem>>(emptyList()) }
+    var showSrsReview by remember { mutableStateOf(false) }
+    LaunchedEffect(book.id, entries) { stats = learnVm.bookStats(book.id) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -319,7 +330,7 @@ private fun BookDetail(book: WordBookEntity, onBack: () -> Unit, vm: WordBookVie
             Column {
                 Text(book.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    stringResource(R.string.wb_stats, entries.size, mastered, book.dailyGoal),
+                    stringResource(R.string.wb_stats_srs, entries.size, stats.mastered, stats.due),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -338,9 +349,9 @@ private fun BookDetail(book: WordBookEntity, onBack: () -> Unit, vm: WordBookVie
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { scope.launch { quizBatch = vm.buildQuizBatch(book, dailyOnly = true) } },
-                enabled = entries.any { it.proficiency < 3 },
-            ) { Text(stringResource(R.string.wb_study_today)) }
+                onClick = { scope.launch { srsItems = learnVm.buildBookSession(book.id); showSrsReview = true } },
+                enabled = stats.due > 0,
+            ) { Text(stringResource(R.string.wb_review_due)) }
             OutlinedButton(
                 onClick = { scope.launch { quizBatch = vm.buildQuizBatch(book, dailyOnly = false) } },
                 enabled = entries.isNotEmpty(),
@@ -352,7 +363,7 @@ private fun BookDetail(book: WordBookEntity, onBack: () -> Unit, vm: WordBookVie
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "${e.english} — ${e.chinese}" + if (e.proficiency >= 3) " ✓" else "",
+                            "${e.english} — ${e.chinese}" + if (stats.masteredIds.contains(e.id)) " ✓" else "",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         if (e.note.isNotBlank()) {
@@ -365,6 +376,15 @@ private fun BookDetail(book: WordBookEntity, onBack: () -> Unit, vm: WordBookVie
                 }
             }
         }
+    }
+
+    if (showSrsReview) {
+        SrsReviewDialog(
+            items = srsItems,
+            onGrade = { c, ok -> scope.launch { learnVm.grade(c, ok) } },
+            onFinished = { n -> scope.launch { if (n > 0) learnVm.markStudiedToday(); stats = learnVm.bookStats(book.id) } },
+            onDismiss = { showSrsReview = false; scope.launch { stats = learnVm.bookStats(book.id) } },
+        )
     }
 
     quizBatch?.let { batch ->

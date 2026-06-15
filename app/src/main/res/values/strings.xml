@@ -263,6 +263,8 @@
     <string name="wb_daily_goal">每日学习量</string>
     <string name="wb_save">保存单词本</string>
     <string name="wb_study_today">今日学习</string>
+    <string name="wb_review_due">今日复习</string>
+    <string name="wb_stats_srs">%1$d 词 · 已掌握 %2$d · 今日到期 %3$d</string>
     <string name="wb_quiz_all">全量抽查</string>
     <string name="wb_dir_zh2en">中→英</string>
     <string name="wb_dir_en2zh">英→中</string>

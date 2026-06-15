@@ -29,6 +29,9 @@ class LearnViewModel @Inject constructor(
 
     data class BookDue(val bookId: Long, val name: String, val due: Int)
 
+    /** 单词本详情统计：today 到期数、已掌握（box≥MAX_BOX）数及其源行 id 集合。 */
+    data class BookStats(val due: Int, val mastered: Int, val masteredIds: Set<Long>)
+
     data class LearnUi(
         val displayStreak: Int = 0,
         val todayDue: Int = 0,
@@ -97,6 +100,17 @@ class LearnViewModel @Inject constructor(
         val cards = reviewCardDao.byType("WORD_ENTRY").filter { it.sourceId in ids }
         return DuePool.select(cards, now, book.dailyGoal, { it.box }, { it.dueAt }, { it.lastReviewedAt })
             .mapNotNull { toItem(it) }.shuffled()
+    }
+
+    /** 单词本详情统计：今日到期数 + 已掌握集合。 */
+    suspend fun bookStats(bookId: Long): BookStats {
+        val now = System.currentTimeMillis()
+        val ids = wordBookDao.entriesOnce(bookId).map { it.id }.toSet()
+        val cards = reviewCardDao.byType("WORD_ENTRY").filter { it.sourceId in ids }
+        val daily = wordBookDao.observeBooks().first().firstOrNull { it.id == bookId }?.dailyGoal ?: 10
+        val due = DuePool.select(cards, now, daily, { it.box }, { it.dueAt }, { it.lastReviewedAt }).size
+        val masteredIds = cards.filter { it.box >= SrsScheduler.MAX_BOX }.map { it.sourceId }.toSet()
+        return BookStats(due, masteredIds.size, masteredIds)
     }
 
     /** 错题本：missCount≥阈值的卡，按错次降序解析。 */

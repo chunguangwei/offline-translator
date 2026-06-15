@@ -256,7 +256,7 @@ fun LearnScreen(
  * 统一复习翻卡 Dialog：跨来源今日到期卡。正面 front → 翻面 back(+note) → 认识/再练 评分落库。
  */
 @Composable
-private fun SrsReviewDialog(
+internal fun SrsReviewDialog(
     items: List<LearnViewModel.ReviewItem>,
     onGrade: (com.offlinetranslator.app.core.data.db.ReviewCardEntity, Boolean) -> Unit,
     onFinished: (reviewedCount: Int) -> Unit,
