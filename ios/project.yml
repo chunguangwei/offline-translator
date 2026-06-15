@@ -10,7 +10,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.10"
-    MARKETING_VERSION: "1.0.6"
+    MARKETING_VERSION: "1.0.7"
     CURRENT_PROJECT_VERSION: "1"
     # 免费 Apple 账号：在 Xcode 的 Signing & Capabilities 里选 Personal Team 即可真机调试。
     CODE_SIGN_STYLE: Automatic
