@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 // 单词本系统 —— 设计规则见 docs/superpowers/specs/2026-06-12-yiren-wordbook-design.md。
@@ -194,6 +195,7 @@ struct ImportWordBookView: View {
     @State private var purpose = ""
     @State private var dailyGoal = 10
     @State private var showFile = false
+    @FocusState private var editorFocused: Bool
 
     private var zh: Bool { PromptTemplates.isZhUi }
 
@@ -203,7 +205,9 @@ struct ImportWordBookView: View {
                 if extractor.drafts.isEmpty && !extractor.isExtracting {
                     Section(zh ? "生词文本" : "Vocab text") {
                         TextEditor(text: $text)
-                            .frame(minHeight: 140)
+                            // 限高内部滚动：文字再多也不会把下方按钮挤出屏幕。
+                            .frame(minHeight: 140, maxHeight: 280)
+                            .focused($editorFocused)
                             .overlay(alignment: .topLeading) {
                                 if text.isEmpty {
                                     Text(zh ? "粘贴生词文本（英文词表或带中文释义都行）…" : "Paste vocab text…")
@@ -279,18 +283,52 @@ struct ImportWordBookView: View {
                         dismiss()
                     }
                 }
+                // 主操作放 toolbar：文字再长「提取」也始终可见、不被内容挤出屏幕。
+                ToolbarItem(placement: .topBarTrailing) {
+                    if extractor.drafts.isEmpty && !extractor.isExtracting {
+                        Button(zh ? "提取" : "Extract") { extractor.extract(text) }
+                            .fontWeight(.semibold)
+                            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+                // 键盘上方「完成」收起键盘（多行输入框点别处不一定收起）。
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(zh ? "完成" : "Done") { editorFocused = false }
+                }
             }
-            .fileImporter(isPresented: $showFile, allowedContentTypes: [.plainText, .text]) { result in
+            .scrollDismissesKeyboard(.interactively)
+            .fileImporter(isPresented: $showFile, allowedContentTypes: [.plainText, .rtf]) { result in
                 if case .success(let url) = result {
                     let secured = url.startAccessingSecurityScopedResource()
                     defer { if secured { url.stopAccessingSecurityScopedResource() } }
-                    if let content = try? String(contentsOf: url, encoding: .utf8) {
+                    if let content = Self.readImportedText(from: url) {
                         text = content
                     }
                 }
             }
         }
         .interactiveDismissDisabled(extractor.isExtracting)
+    }
+
+    /// 读导入文件为纯文本：RTF 提取纯文字；其余按 UTF-8（失败再兜底其它编码）。
+    /// 同时防御被命名为 .txt 实为 RTF 的文件（开头 `{\rtf`）。
+    static func readImportedText(from url: URL) -> String? {
+        if url.pathExtension.lowercased() == "rtf",
+           let attr = try? NSAttributedString(url: url, options: [:], documentAttributes: nil) {
+            return attr.string
+        }
+        if let s = try? String(contentsOf: url, encoding: .utf8) {
+            if s.hasPrefix("{\\rtf"), let data = s.data(using: .utf8),
+               let plain = try? NSAttributedString(
+                   data: data,
+                   options: [.documentType: NSAttributedString.DocumentType.rtf],
+                   documentAttributes: nil).string {
+                return plain
+            }
+            return s
+        }
+        return try? String(contentsOf: url) // 非 UTF-8 编码兜底
     }
 
     private func save() {
