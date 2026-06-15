@@ -1,7 +1,7 @@
 {
-  "version": "1.0.17",
-  "notes": "◆ 修复\n· 单词本提取超 token 报错：粘贴一整段没有换行的长词表时，分块只按换行切、整段塞进\n  模型导致超出上下文窗口（`Input token ids are too long … >= 4096`）。现改为行内按字符硬切，\n  并把分块大小按当前模型的上下文窗口（maxTokens）自动推导，长文本会自动拆成多块分次提取。\n  双端对齐。\n· iOS 单词本「去重」误触发「添加词」：两个按钮在列表行内未指定样式，被 SwiftUI 当作整行单一\n  点击目标，点「去重」实际触发了「添加词」。已给各按钮独立样式修复（仅 iOS，安卓无此问题）。\n\n> 对应 iOS 1.0.8。\n\n",
-  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.17/yiren-v1.0.17.apk",
-  "size": 38025182,
-  "apkSha256": "a8a812b4afc60e2f9aba74ffff3f369f7650eda2743e690eb997b1f77531750b"
+  "version": "1.0.18",
+  "notes": "◆ 优化\n· 单词本提取防误关：提取过程中、或提取出的词还没保存时，下拉 / 点弹窗外 / 返回都不会\n  关闭弹窗，避免手滑把已提取的词丢掉。要离开点「取消」，若有未保存结果会二次确认\n  「丢弃 N 个词?」。提取中的按钮两端统一为 「停止」（停止提取、保留已提取的，可接着保存）。\n  双端对齐。\n\n> 对应 iOS 1.0.9。\n\n",
+  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.18/yiren-v1.0.18.apk",
+  "size": 38025874,
+  "apkSha256": "7ba4c83546e3ffbc0425b4a7f5db623b1579ee62dbd1db9772c084daea1e9550"
 }
