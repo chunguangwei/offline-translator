@@ -1,7 +1,7 @@
 {
-  "version": "1.0.13",
-  "notes": "◆ 修复\n· Android 单词本导入 RTF 自动提纯：导入从备忘录 / Pages 导出的 RTF 文件时，\n  不再出现满屏排版标记，自动提取出纯文字（含中文）。此前仅 iOS 已修，本版对齐 Android\n\n",
-  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.13/yiren-v1.0.13.apk",
-  "size": 37956766,
-  "apkSha256": "43f1448fbfe9441f6834f6e873678943a83ec883a1f54c11564be6911778c8d0"
+  "version": "1.0.14",
+  "notes": "◆ 修复\n· 修复单词本闪退：打开单词本列表 / 详情时统计数字（X 词 · 掌握 X · 每日 X）\n  不停闪烁、进入后狂刷新、最终崩溃。根因是每次界面刷新都重建一次数据流形成无限循环，\n  现已彻底修复。（仅 Android 受影响）\n\n◆ 新增\n· 单词本支持编辑与添加：可编辑单词本信息（名称 / 用途 / 每日目标）、编辑或删除单个词条；\n  新增「添加词」——既可粘贴文本让 AI 提取追加，也可手动添加单条。添加时自动去重\n  （同一英文词不重复入库），新词同步纳入间隔重复（SRS）记忆系统。双端对齐。\n· 全量备份与还原：在「设置 → 备份与还原」把单词本、学习进度、翻译记录、问答会话与\n  应用设置导出为一个文件（存网盘 / AirDrop / 微信均可），换手机后导入即可恢复；\n  导入采用合并去重（不覆盖已有数据）。采用平台中立格式，安卓与 iPhone 可跨平台互导。\n  （模型文件因体积过大不在备份内，换机后重新下载即可）\n\n> 对应 iOS 1.0.5（编辑/添加/去重 + 备份还原 同步，备份文件与 Android 互通）。\n\n",
+  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.14/yiren-v1.0.14.apk",
+  "size": 38008154,
+  "apkSha256": "da7fefe952dcaea39c06323eee6dc07976cb446babd4a464eb45f836b44f51a6"
 }
