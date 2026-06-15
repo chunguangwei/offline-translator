@@ -273,6 +273,10 @@
     <string name="wb_quiz_done">本轮 %1$d 张全部过关\n一次记住 %2$d 张</string>
     <string name="wb_edit_book">编辑单词本</string>
     <string name="wb_add_word">添加词</string>
+    <string name="wb_dedup">去重</string>
+    <string name="wb_dedup_confirm">将合并本内重复的英文词条，每个词只保留学习进度最高的一条。继续？</string>
+    <string name="wb_dedup_done">已清理 %1$d 个重复词</string>
+    <string name="wb_dedup_none">没有重复词条</string>
     <string name="wb_add_extract">提取</string>
     <string name="wb_add_manual">手动</string>
     <string name="wb_add_to_book">保存到本</string>

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -41,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -315,6 +317,7 @@ private fun BookDetail(
 ) {
     val entries by vm.entries(book.id).collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var direction by remember { mutableStateOf(QuizDirection.MIXED) }
     var quizBatch by remember { mutableStateOf<List<WordEntryEntity>?>(null) }
     // SRS：今日复习用单词本的到期卡；掌握标记按 box≥MAX_BOX。
@@ -323,6 +326,7 @@ private fun BookDetail(
     var showSrsReview by remember { mutableStateOf(false) }
     var showEditBook by remember { mutableStateOf(false) }
     var showAddWord by remember { mutableStateOf(false) }
+    var showDedupConfirm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<WordEntryEntity?>(null) }
     LaunchedEffect(book.id, entries) { stats = learnVm.bookStats(book.id) }
 
@@ -365,10 +369,15 @@ private fun BookDetail(
             ) { Text(stringResource(R.string.wb_quiz_all)) }
         }
         Spacer(Modifier.height(6.dp))
-        OutlinedButton(onClick = { vm.resetImport(); showAddWord = true }) {
-            Icon(Icons.Rounded.Add, contentDescription = null)
-            Spacer(Modifier.height(0.dp))
-            Text(stringResource(R.string.wb_add_word))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { vm.resetImport(); showAddWord = true }) {
+                Icon(Icons.Rounded.Add, contentDescription = null)
+                Spacer(Modifier.height(0.dp))
+                Text(stringResource(R.string.wb_add_word))
+            }
+            OutlinedButton(onClick = { showDedupConfirm = true }) {
+                Text(stringResource(R.string.wb_dedup))
+            }
         }
         Spacer(Modifier.height(8.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -418,6 +427,33 @@ private fun BookDetail(
             vm = vm,
             onDismiss = { vm.resetImport(); showAddWord = false },
             onChanged = { scope.launch { stats = learnVm.bookStats(book.id) } },
+        )
+    }
+
+    if (showDedupConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDedupConfirm = false },
+            title = { Text(stringResource(R.string.wb_dedup)) },
+            text = { Text(stringResource(R.string.wb_dedup_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDedupConfirm = false
+                    vm.dedupBook(book.id) { n ->
+                        android.widget.Toast.makeText(
+                            context,
+                            if (n > 0) context.getString(R.string.wb_dedup_done, n)
+                            else context.getString(R.string.wb_dedup_none),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                        scope.launch { stats = learnVm.bookStats(book.id) }
+                    }
+                }) { Text(stringResource(R.string.wb_dedup)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDedupConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
         )
     }
 
