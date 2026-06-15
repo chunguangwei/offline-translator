@@ -57,13 +57,15 @@ class WordBookViewModel @Inject constructor(
 
     // ── 导入：读文件 ──
 
-    /** 读取用户选择的文本文件内容（失败返回 null）。 */
+    /** 读取用户选择的文本文件内容（失败返回 null）。RTF（备忘录/Pages 导出）自动提纯。 */
     suspend fun readTextFile(uri: Uri): String? = withContext(Dispatchers.IO) {
         runCatching {
             context.contentResolver.openInputStream(uri)?.use {
                 it.readBytes().toString(Charsets.UTF_8)
             }
-        }.getOrNull()?.takeIf { it.isNotBlank() }
+        }.getOrNull()?.takeIf { it.isNotBlank() }?.let { raw ->
+            if (raw.trimStart().startsWith("{\\rtf")) rtfToPlainText(raw) else raw
+        }?.takeIf { it.isNotBlank() }
     }
 
     // ── 导入：AI 提取 ──
@@ -240,4 +242,83 @@ class WordBookViewModel @Inject constructor(
         if (english.none { it.isLetter() } || english.length > 60 || chinese.isBlank()) return null
         return VocabDraft(english, chinese, note)
     }
+}
+
+/**
+ * 最小 RTF → 纯文本（Android 无内置 RTF 解析器）。处理：分组 {}、控制字 \word[N]、
+ * 段落/制表符、忽略目的组（fonttbl/colortbl 等与 \*）、\uN 十进制 Unicode、
+ * 以及连续 \'hh 十六进制字节按 GBK 解码（中文 RTF 常用 charset134=GBK）。尽力而为。
+ */
+internal fun rtfToPlainText(rtf: String): String {
+    val out = StringBuilder()
+    val hex = ArrayList<Byte>()
+    fun flushHex() {
+        if (hex.isNotEmpty()) {
+            runCatching { out.append(String(hex.toByteArray(), charset("GBK"))) }
+            hex.clear()
+        }
+    }
+    val skipWords = setOf("fonttbl", "colortbl", "stylesheet", "info", "pict", "header",
+        "footer", "object", "themedata", "datastore", "latentstyles", "rsidtbl")
+    var i = 0
+    val n = rtf.length
+    var depth = 0
+    var skipDepth = -1            // ≥0 表示正在跳过某目的组（含此深度内全部内容）
+    var ucSkip = 1               // \ucN：\uN 之后要跳过的回退字符数
+    while (i < n) {
+        when (val c = rtf[i]) {
+            '{' -> { flushHex(); depth++; i++ }
+            '}' -> { flushHex(); if (skipDepth in 0..depth) skipDepth = -1; depth--; i++ }
+            '\\' -> {
+                if (i + 1 >= n) { i++; continue }
+                val d = rtf[i + 1]
+                when {
+                    d == '\'' -> { // \'hh 十六进制字节
+                        val b = if (i + 3 < n) rtf.substring(i + 2, i + 4).toIntOrNull(16) else null
+                        if (b != null && skipDepth < 0) hex.add(b.toByte())
+                        i += 4
+                    }
+                    d == '\\' || d == '{' || d == '}' -> { flushHex(); if (skipDepth < 0) out.append(d); i += 2 }
+                    d == '*' -> { flushHex(); if (skipDepth < 0) skipDepth = depth; i += 2 } // 忽略目的组
+                    d.isLetter() -> {
+                        flushHex()
+                        var j = i + 1
+                        while (j < n && rtf[j].isLetter()) j++
+                        val word = rtf.substring(i + 1, j)
+                        var k = j
+                        val neg = k < n && rtf[k] == '-'
+                        if (neg) k++
+                        val numStart = k
+                        while (k < n && rtf[k].isDigit()) k++
+                        val param = if (k > numStart) rtf.substring(numStart, k).toInt().let { if (neg) -it else it } else null
+                        var next = if (k < n && rtf[k] == ' ') k + 1 else k // 一个分隔空格被吞掉
+                        when (word) {
+                            "par", "line", "sect", "pard" -> if (skipDepth < 0) out.append('\n')
+                            "tab" -> if (skipDepth < 0) out.append('\t')
+                            "uc" -> ucSkip = param ?: 1
+                            "u" -> {
+                                if (skipDepth < 0 && param != null) {
+                                    val code = if (param < 0) param + 65536 else param
+                                    out.append(if (code == 8232 || code == 8233) '\n' else code.toChar())
+                                }
+                                var s = 0
+                                while (s < ucSkip && next < n) {
+                                    if (rtf[next] == '\\' && next + 1 < n && rtf[next + 1] == '\'') next += 4 else next += 1
+                                    s++
+                                }
+                            }
+                            in skipWords -> if (skipDepth < 0) skipDepth = depth
+                            else -> { /* 其余控制字丢弃 */ }
+                        }
+                        i = next
+                    }
+                    else -> { flushHex(); i += 2 } // 控制符号 \~ \- 等
+                }
+            }
+            '\r', '\n' -> i++ // RTF 源码里的换行无意义
+            else -> { flushHex(); if (skipDepth < 0) out.append(c); i++ }
+        }
+    }
+    flushHex()
+    return out.toString().trim()
 }

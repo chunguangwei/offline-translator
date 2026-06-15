@@ -208,7 +208,7 @@ private fun ImportDialog(vm: WordBookViewModel, onDismiss: () -> Unit) {
                     )
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { filePicker.launch(arrayOf("text/*")) }) {
+                        OutlinedButton(onClick = { filePicker.launch(arrayOf("text/*", "application/rtf")) }) {
                             Text(stringResource(R.string.wb_pick_file))
                         }
                         Button(onClick = { vm.extract(text) }, enabled = text.isNotBlank()) {
