@@ -1,7 +1,7 @@
 {
-  "version": "1.0.16",
-  "notes": "◆ 优化\n· 复习按钮文案统一：翻卡时表示\"没记住\"的按钮，原先在「今日复习/生词本/错题本」叫\n  「再练」、在单词本「全量抽查」叫「不认识」，两端还不一致。现统一为 「认识 / 不认识」\n  （Got it / Don't know），口径一致、不再混淆。双端对齐。\n\n> 对应 iOS 1.0.7。\n\n",
-  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.16/yiren-v1.0.16.apk",
-  "size": 38008798,
-  "apkSha256": "f9b78067ef0026aa4442c00a8afa2d99a4fcc1afdb92153079f36f90a9849367"
+  "version": "1.0.17",
+  "notes": "◆ 修复\n· 单词本提取超 token 报错：粘贴一整段没有换行的长词表时，分块只按换行切、整段塞进\n  模型导致超出上下文窗口（`Input token ids are too long … >= 4096`）。现改为行内按字符硬切，\n  并把分块大小按当前模型的上下文窗口（maxTokens）自动推导，长文本会自动拆成多块分次提取。\n  双端对齐。\n· iOS 单词本「去重」误触发「添加词」：两个按钮在列表行内未指定样式，被 SwiftUI 当作整行单一\n  点击目标，点「去重」实际触发了「添加词」。已给各按钮独立样式修复（仅 iOS，安卓无此问题）。\n\n> 对应 iOS 1.0.8。\n\n",
+  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.17/yiren-v1.0.17.apk",
+  "size": 38025182,
+  "apkSha256": "a8a812b4afc60e2f9aba74ffff3f369f7650eda2743e690eb997b1f77531750b"
 }
