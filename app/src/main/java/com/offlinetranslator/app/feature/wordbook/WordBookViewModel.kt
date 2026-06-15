@@ -189,6 +189,74 @@ class WordBookViewModel @Inject constructor(
         }
     }
 
+    /** 把当前导入草稿(_import.drafts)合并去重后加入已有单词本，并为新词建 SRS 卡。 */
+    fun addExtractedToBook(bookId: Long, onDone: () -> Unit) {
+        viewModelScope.launch {
+            val existingKeys = dao.entriesOnce(bookId).map { it.english.trim().lowercase() }.toSet()
+            val toAdd = dedupDrafts(_import.value.drafts, existingKeys)
+            if (toAdd.isNotEmpty()) {
+                val now = System.currentTimeMillis()
+                dao.insertEntries(toAdd.map {
+                    WordEntryEntity(
+                        bookId = bookId, english = it.english, chinese = it.chinese,
+                        note = it.note, createdAt = now,
+                    )
+                })
+                // insertAll 对 (sourceType, sourceId) 唯一索引用 IGNORE，已有卡的词条会被忽略，仅新词建卡。
+                val cardNow = System.currentTimeMillis()
+                reviewCardDao.insertAll(dao.entriesOnce(bookId).map {
+                    ReviewCardEntity(
+                        sourceType = "WORD_ENTRY", sourceId = it.id,
+                        box = 0, dueAt = cardNow, missCount = 0, lastReviewedAt = 0, createdAt = cardNow,
+                    )
+                })
+            }
+            resetImport()
+            onDone()
+        }
+    }
+
+    /** 手动加一条；英文键在本内已存在则返回 false 不加。en/zh 必填。回调在主线程回传结果。 */
+    fun addManualEntry(bookId: Long, english: String, chinese: String, note: String, onResult: (Boolean) -> Unit) {
+        val en = english.trim()
+        val zh = chinese.trim()
+        val nt = note.trim()
+        if (en.isBlank() || zh.isBlank()) {
+            onResult(false)
+            return
+        }
+        viewModelScope.launch {
+            val dup = dao.entriesOnce(bookId).any { it.english.trim().lowercase() == en.lowercase() }
+            if (dup) {
+                onResult(false)
+                return@launch
+            }
+            val now = System.currentTimeMillis()
+            dao.insertEntries(listOf(
+                WordEntryEntity(bookId = bookId, english = en, chinese = zh, note = nt, createdAt = now)
+            ))
+            reviewCardDao.insertAll(dao.entriesOnce(bookId).map {
+                ReviewCardEntity(
+                    sourceType = "WORD_ENTRY", sourceId = it.id,
+                    box = 0, dueAt = now, missCount = 0, lastReviewedAt = 0, createdAt = now,
+                )
+            })
+            onResult(true)
+        }
+    }
+
+    fun updateEntry(id: Long, english: String, chinese: String, note: String) {
+        viewModelScope.launch {
+            dao.updateEntry(id, english.trim(), chinese.trim(), note.trim())
+        }
+    }
+
+    fun updateBook(id: Long, name: String, purpose: String, dailyGoal: Int) {
+        viewModelScope.launch {
+            dao.updateBook(id, name.trim(), purpose.trim(), dailyGoal.coerceAtLeast(1))
+        }
+    }
+
     fun deleteBook(id: Long) {
         viewModelScope.launch {
             // 先删该本所有词条对应的复习卡，再删词条/本，保持 review_card 同步。
