@@ -176,7 +176,7 @@ struct LearnView: View {
     }
 }
 
-/// 统一 SRS 复习卡片视图：正面 → 翻面（含 note）→ 认识/再练落库评分。
+/// 统一 SRS 复习卡片视图：正面 → 翻面（含 note）→ 认识/不认识落库评分。
 struct SrsReviewView: View {
     let items: [SrsStore.ReviewItem]
     let onGrade: (ReviewCard, Bool) -> Void
@@ -220,7 +220,7 @@ struct SrsReviewView: View {
                 .onTapGesture { revealed.toggle() }
                 Spacer()
                 HStack(spacing: 16) {
-                    Button(zh ? "再练" : "Again") {
+                    Button(zh ? "不认识" : "Don't know") {
                         onGrade(item.card, false); reviewed += 1
                         let c = queue.removeFirst(); queue.append(c); revealed = false
                     }.buttonStyle(.bordered)
@@ -238,7 +238,7 @@ struct SrsReviewView: View {
     }
 }
 
-/// 生词本抽卡练习（自 HistoryView 迁来）：正面原文 → 翻面译文 → 认识移出/再练放回队尾。
+/// 生词本抽卡练习（自 HistoryView 迁来）：正面原文 → 翻面译文 → 认识移出/不认识放回队尾。
 struct StarredPracticeView: View {
     let items: [TranslationRecord]
     @State private var queue: [TranslationRecord] = []
@@ -288,7 +288,7 @@ struct StarredPracticeView: View {
                 .onTapGesture { revealed.toggle() }
                 Spacer()
                 HStack(spacing: 16) {
-                    Button(zh ? "再练" : "Again") {
+                    Button(zh ? "不认识" : "Don't know") {
                         let c = queue.removeFirst()
                         queue.append(c)
                         revealed = false

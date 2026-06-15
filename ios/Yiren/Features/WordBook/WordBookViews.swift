@@ -592,7 +592,7 @@ struct WordQuizView: View {
                 .onTapGesture { revealed.toggle() }
                 Spacer()
                 HStack(spacing: 16) {
-                    Button(zh ? "不认识" : "Again") {
+                    Button(zh ? "不认识" : "Don't know") {
                         grade(card, known: false)
                         missed.insert(card.persistentModelID)
                         let c = queue.removeFirst()

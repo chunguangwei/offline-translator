@@ -223,7 +223,7 @@
     <string name="practice_start">Practice</string>
     <string name="practice_progress">Card %1$d / %2$d</string>
     <string name="practice_tap_reveal">Tap card to reveal</string>
-    <string name="practice_again">Again</string>
+    <string name="practice_again">Don\'t know</string>
     <string name="practice_know">Got it</string>
     <string name="practice_done">All done for this round!</string>
     <string name="practice_close">Done</string>

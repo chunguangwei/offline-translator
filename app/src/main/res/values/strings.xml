@@ -233,7 +233,7 @@
     <string name="practice_start">开始练习</string>
     <string name="practice_progress">第 %1$d / %2$d 张</string>
     <string name="practice_tap_reveal">点击卡片看译文</string>
-    <string name="practice_again">再练</string>
+    <string name="practice_again">不认识</string>
     <string name="practice_know">认识</string>
     <string name="practice_done">本轮全部记住了！</string>
     <string name="practice_close">完成</string>
