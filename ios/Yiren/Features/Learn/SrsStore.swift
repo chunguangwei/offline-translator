@@ -97,6 +97,32 @@ enum SrsStore {
         return cards.compactMap { toItem(context, $0) }
     }
 
+    /// 取本册的全部 WORD_ENTRY 调度卡。
+    static func bookCards(_ context: ModelContext, _ book: WordBook) -> [ReviewCard] {
+        let ids = Set(book.entries.map { $0.uid })
+        let wordCards = (try? context.fetch(FetchDescriptor<ReviewCard>(
+            predicate: #Predicate { $0.sourceType == "WORD_ENTRY" }))) ?? []
+        return wordCards.filter { ids.contains($0.sourceId) }
+    }
+
+    static func buildBookSession(_ context: ModelContext, _ book: WordBook) -> [ReviewItem] {
+        let now = nowMs()
+        let cards = bookCards(context, book)
+        return DuePool.select(cards: cards, now: now, newLimit: book.dailyGoal,
+            box: { $0.box }, dueAt: { $0.dueAt }, lastReviewedAt: { $0.lastReviewedAt })
+            .compactMap { toItem(context, $0) }.shuffled()
+    }
+
+    /// 某单词本统计：(今日到期数, 已掌握数=box≥MAX_BOX, 该词是否已掌握的 uid 集)。
+    static func bookStats(_ context: ModelContext, _ book: WordBook) -> (due: Int, mastered: Int, masteredUids: Set<String>) {
+        let now = nowMs()
+        let cards = bookCards(context, book)
+        let due = DuePool.select(cards: cards, now: now, newLimit: book.dailyGoal,
+            box: { $0.box }, dueAt: { $0.dueAt }, lastReviewedAt: { $0.lastReviewedAt }).count
+        let masteredUids = Set(cards.filter { $0.box >= SrsScheduler.maxBox }.map { $0.sourceId })
+        return (due, masteredUids.count, masteredUids)
+    }
+
     /// 评分落库。
     static func grade(_ context: ModelContext, _ card: ReviewCard, correct: Bool) {
         let u = SrsScheduler.schedule(box: card.box, missCount: card.missCount, correct: correct, now: nowMs())

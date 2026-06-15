@@ -370,9 +370,15 @@ struct WordBookDetailView: View {
     @Environment(\.modelContext) private var context
     @State private var direction: QuizDirection = .mixed
     @State private var quizBatch: [WordEntry]?
+    // 「今日学习」现走 SRS：本册到期卡 → 翻卡 → 认识后隔天才再现（不再原地重复）。
+    @State private var srsItems: [SrsStore.ReviewItem] = []
+    @State private var showSrsReview = false
+    // SRS 统计（到期数 / 已掌握=box≥6 / 已掌握词 uid 集），进页与复习后刷新。
+    @State private var stats: (due: Int, mastered: Int, masteredUids: Set<String>) = (0, 0, [])
 
     private var zh: Bool { PromptTemplates.isZhUi }
-    private var mastered: Int { book.entries.filter { $0.proficiency >= 3 }.count }
+
+    private func refreshStats() { stats = SrsStore.bookStats(context, book) }
 
     var body: some View {
         List {
@@ -384,17 +390,15 @@ struct WordBookDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 HStack(spacing: 12) {
-                    Button(zh ? "今日学习" : "Study today") {
-                        // 未掌握词优先最久没见的，取每日量。
-                        quizBatch = book.entries
-                            .filter { $0.proficiency < 3 }
-                            .sorted { $0.lastSeenAt < $1.lastSeenAt }
-                            .prefix(book.dailyGoal)
-                            .shuffled()
+                    // 今日复习：本册 SRS 到期卡（认识后隔天再现，不再原地重复）。
+                    Button(zh ? "今日复习" : "Review due") {
+                        srsItems = SrsStore.buildBookSession(context, book)
+                        showSrsReview = true
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.brandPrimary)
-                    .disabled(!book.entries.contains { $0.proficiency < 3 })
+                    .disabled(stats.due == 0)
+                    // 全量抽查：整本打散纯练手，不改 SRS 进度。
                     Button(zh ? "全量抽查" : "Random quiz") {
                         quizBatch = book.entries.shuffled()
                     }
@@ -402,13 +406,13 @@ struct WordBookDetailView: View {
                     .disabled(book.entries.isEmpty)
                 }
             } footer: {
-                Text(zh ? "\(book.entries.count) 词 · 已掌握 \(mastered) · 认识 3 次即掌握"
-                        : "\(book.entries.count) words · \(mastered) mastered · 3 correct = mastered")
+                Text(zh ? "\(book.entries.count) 词 · 已掌握 \(stats.mastered) · 今日到期 \(stats.due)"
+                        : "\(book.entries.count) words · \(stats.mastered) mastered · \(stats.due) due today")
             }
             Section {
                 ForEach(book.entries.sorted { $0.createdAt < $1.createdAt }, id: \.persistentModelID) { e in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(e.english) — \(e.chinese)" + (e.proficiency >= 3 ? " ✓" : ""))
+                        Text("\(e.english) — \(e.chinese)" + (stats.masteredUids.contains(e.uid) ? " ✓" : ""))
                             .font(.subheadline)
                         if !e.note.isEmpty {
                             Text(e.note).font(.caption).foregroundStyle(.secondary)
@@ -426,11 +430,19 @@ struct WordBookDetailView: View {
         }
         .navigationTitle(book.name)
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { refreshStats() }
         .sheet(item: Binding(
             get: { quizBatch.map { QuizPayload(batch: $0, direction: direction) } },
             set: { if $0 == nil { quizBatch = nil } }
         )) { payload in
             WordQuizView(payload: payload)
+        }
+        .sheet(isPresented: $showSrsReview, onDismiss: { refreshStats() }) {
+            SrsReviewView(
+                items: srsItems,
+                onGrade: { c, ok in SrsStore.grade(context, c, correct: ok) },
+                onFinished: { n in if n > 0 { SrsStore.markStudiedToday() }; refreshStats() }
+            )
         }
     }
 }
