@@ -28,6 +28,18 @@ import javax.inject.Inject
 /** 提取出的词条草稿（预览阶段，可删错项后再入库）。 */
 data class VocabDraft(val english: String, val chinese: String, val note: String)
 
+/** 批次内按英文键（trim+lowercase）去重 + 排除 existingKeys，保持原顺序；空英文丢弃。 */
+fun dedupDrafts(drafts: List<VocabDraft>, existingKeys: Set<String>): List<VocabDraft> {
+    val seen = HashSet(existingKeys)
+    val out = ArrayList<VocabDraft>()
+    for (d in drafts) {
+        val k = d.english.trim().lowercase()
+        if (k.isEmpty()) continue
+        if (seen.add(k)) out.add(d)
+    }
+    return out
+}
+
 data class ImportUi(
     val isExtracting: Boolean = false,
     /** 正在加载模型（首载提示）。 */
@@ -108,7 +120,7 @@ class WordBookViewModel @Inject constructor(
                         var nl = sb.indexOf("\n")
                         while (nl >= 0) {
                             parseLine(sb.substring(0, nl))?.let { d ->
-                                seen.putIfAbsent(d.english.lowercase(), d)
+                                seen.putIfAbsent(d.english.trim().lowercase(), d)
                             }
                             sb.delete(0, nl + 1)
                             nl = sb.indexOf("\n")
@@ -117,7 +129,7 @@ class WordBookViewModel @Inject constructor(
                             it.copy(extractedCount = seen.size, drafts = seen.values.toList())
                         }
                     }
-                    parseLine(sb.toString())?.let { d -> seen.putIfAbsent(d.english.lowercase(), d) }
+                    parseLine(sb.toString())?.let { d -> seen.putIfAbsent(d.english.trim().lowercase(), d) }
                     _import.update { it.copy(extractedCount = seen.size, drafts = seen.values.toList()) }
                 }
                 _import.update { it.copy(isExtracting = false) }
@@ -148,7 +160,7 @@ class WordBookViewModel @Inject constructor(
 
     /** 保存为新单词本。 */
     fun saveBook(name: String, purpose: String, dailyGoal: Int, onDone: () -> Unit) {
-        val drafts = _import.value.drafts
+        val drafts = dedupDrafts(_import.value.drafts, emptySet())
         if (name.isBlank() || drafts.isEmpty()) return
         viewModelScope.launch {
             val bookId = dao.insertBook(
