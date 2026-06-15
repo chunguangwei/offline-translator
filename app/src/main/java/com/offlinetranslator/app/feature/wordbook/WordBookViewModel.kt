@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -52,8 +53,15 @@ class WordBookViewModel @Inject constructor(
 
     private var extractJob: Job? = null
 
-    fun entries(bookId: Long) = dao.observeEntries(bookId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<WordEntryEntity>())
+    // 每本单词本的词条流按 bookId 缓存：同一本始终返回同一个 StateFlow。
+    // 否则每次 Compose 重组都新建一条 stateIn（重发 emptyList→list，且泄漏 5s 上游协程），
+    // 与详情页 LaunchedEffect 形成无限重组 → 闪烁、协程爆炸最终崩溃。
+    private val entryFlows = mutableMapOf<Long, StateFlow<List<WordEntryEntity>>>()
+
+    fun entries(bookId: Long): StateFlow<List<WordEntryEntity>> = entryFlows.getOrPut(bookId) {
+        dao.observeEntries(bookId)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<WordEntryEntity>())
+    }
 
     // ── 导入：读文件 ──
 
