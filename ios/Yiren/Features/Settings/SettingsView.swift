@@ -169,6 +169,9 @@ struct SettingsView: View {
                             : "Third-party: Google LiteRT-LM SDK and Gemma models (under their own licenses).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    Link(zh ? "版权联系 / 问题反馈: chunguangwee@gmail.com"
+                            : "Copyright / feedback: chunguangwee@gmail.com",
+                         destination: URL(string: "mailto:chunguangwee@gmail.com")!)
                     Text(zh ? "所有 AI 推理均在本地完成，绝不上传任何文本、图片、音频或使用行为。联网仅发生在三种情况：下载模型、检查更新、启动时获取启动图与运营信息——这些请求都不包含任何个人数据。"
                             : "All AI inference runs on-device. We never upload your text, images, audio, or usage. Network is used only for downloading models, checking for updates, and fetching the launch splash/promo config — none of these contain any personal data.")
                         .font(.footnote)

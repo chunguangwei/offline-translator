@@ -22,6 +22,7 @@
 | **主分类 Primary** | 参考（Reference） | Reference |
 | **次分类 Secondary** | 教育（Education） | Education |
 | **版权 Copyright** | © 2026 weichunguang | © 2026 weichunguang |
+| **版权/反馈联系 Contact** | chunguangwee@gmail.com | chunguangwee@gmail.com |
 | **价格 Price** | 免费（Free） | Free |
 
 > 备选主分类：效率（Productivity）。翻译类放 参考 / 效率 都常见；学习闭环让 教育 适合做次分类。
@@ -110,6 +111,7 @@ offline translator,translate,english,dictionary,AI,vocabulary,flashcards,SRS,voi
 | 字段 | 值 | 说明 |
 |---|---|---|
 | **支持 URL Support URL** | https://github.com/chunguangwei/offline-translator | 必填。可后续换成专门支持页 |
+| **支持/反馈邮箱 Support email** | chunguangwee@gmail.com | 版权联系人 & bug/反馈接收邮箱；App Review Contact 也用此邮箱 |
 | **营销 URL Marketing URL** | （可留空） | 选填 |
 | **隐私政策 URL Privacy Policy** | **https://chunguangwei.github.io/offline-translator/privacy/** ✅ 已上线 | **必填** |
 

@@ -51,7 +51,7 @@
 
 ### 联系我们
 
-如有隐私相关问题，请联系：**chunguangwei@gmail.com**
+如有隐私相关问题，请联系：**chunguangwee@gmail.com**
 
 ---
 
@@ -105,4 +105,4 @@ If this policy changes, we will update the "Last updated" date on this page.
 
 ### Contact
 
-For privacy questions, contact: **chunguangwei@gmail.com**
+For privacy questions, contact: **chunguangwee@gmail.com**

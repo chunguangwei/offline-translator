@@ -465,7 +465,7 @@ git push
 
 **专有许可（Proprietary）** — 详见 [LICENSE](LICENSE)。
 
-版权所有 © 2026 weichunguang，保留所有权利。可出于个人学习、研究、评估目的查看、运行、修改与（非商业）分享，须保留本协议与版权声明；**任何商业用途须事先获得著作权人 weichunguang（chunguangwei@gmail.com）的书面同意**。
+版权所有 © 2026 weichunguang，保留所有权利。可出于个人学习、研究、评估目的查看、运行、修改与（非商业）分享，须保留本协议与版权声明；**任何商业用途须事先获得著作权人 weichunguang（chunguangwee@gmail.com）的书面同意**。
 
 第三方组件遵循各自原协议：
 - [LiteRT-LM SDK](https://github.com/google-ai-edge/litert-lm) — Apache 2.0
