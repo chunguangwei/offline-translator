@@ -403,6 +403,14 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(6.dp))
+            val contactEmail = stringResource(R.string.settings_about_contact_email)
+            Text(
+                text = stringResource(R.string.settings_about_contact_label) + ": " + contactEmail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { uriHandler.openUri("mailto:$contactEmail") },
+            )
             Spacer(Modifier.height(10.dp))
             Text(
                 text = stringResource(R.string.settings_privacy_content),

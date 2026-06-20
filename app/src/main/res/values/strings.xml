@@ -302,6 +302,8 @@
     <string name="settings_about_repo">GitHub 仓库</string>
     <string name="settings_about_repo_url">https://github.com/chunguangwei/offline-translator</string>
     <string name="settings_about_credits">第三方组件：Google LiteRT-LM SDK 与 Gemma 模型（遵循各自原始许可）。</string>
+    <string name="settings_about_contact_label">版权联系 / 问题反馈</string>
+    <string name="settings_about_contact_email">chunguangwee@gmail.com</string>
 
     <!-- App update (GitHub Releases) -->
     <string name="settings_update">应用更新</string>
