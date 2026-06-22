@@ -24,8 +24,8 @@ android {
         // Min API 26 (Android 8) — covers all Huawei Mate 10 / P20 / nova 3 onward.
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.0.19"
+        versionCode = 21
+        versionName = "1.0.20"
 
         // Restrict to ABIs that LiteRT ships. Most modern Huawei devices
         // (Mate / P / nova) are arm64-v8a; armeabi-v7a kept for older fallback.

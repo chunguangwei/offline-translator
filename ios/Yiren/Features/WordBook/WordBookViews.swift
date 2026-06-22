@@ -18,7 +18,11 @@ struct VocabDraft: Identifiable, Equatable {
 /// 提取引擎逻辑（分块 + 流式解析 + 去重）。
 @MainActor
 final class VocabExtractor: ObservableObject {
-    @Published var isExtracting = false
+    // 提取是分块长任务（可达数分钟），期间禁用自动锁屏：
+    // 一旦熄屏，App 进后台被系统挂起，正在跑的推理 Task 随之停住、提取中断。
+    @Published var isExtracting = false {
+        didSet { UIApplication.shared.isIdleTimerDisabled = isExtracting }
+    }
     @Published var loadingModel = false
     @Published var drafts: [VocabDraft] = []
     @Published var errorMessage: String?
