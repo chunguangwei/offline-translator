@@ -1,7 +1,7 @@
 {
-  "version": "1.0.20",
-  "notes": "◆ 修复\n· 提取学习单词时不再因熄屏中断：AI 提取生词是分块流式的长任务（文本越长越久），此前提取途中\n  系统会自动熄屏锁屏，锁屏后任务被系统挂起 / GPU 推理停滞，导致提取中断、半途而废。现提取期间\n  自动保持屏幕常亮，结束/停止后恢复，长文本可一次提取到完成。双端对齐（新建词本提取 +\n  词本内「加生词」提取两处入口均生效）。\n\n> 对应 iOS 1.0.11。\n> 说明：本修复针对「自动熄屏」；提取中手动按电源键锁屏，iOS 仍会挂起 App（系统级限制）。\n\n",
-  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.20/yiren-v1.0.20.apk",
-  "size": 38026118,
-  "apkSha256": "80f95619bd1468593a6ca3fbf8f447e9afcdb00a0d03e38d19614ed6e9d29c07"
+  "version": "1.0.21",
+  "notes": "◆ 修复\n· 模型下载熄屏/切后台不再中断（仅 Android）：模型文件较大、下载耗时长，此前下载跑在前台协程里，\n  熄屏或切到后台时会被国产 ROM（vivo OriginOS / MIUI 等）冻结进程导致暂停。现改为自管前台服务\n  （常驻进度通知 + 应用级协程下载），熄屏/切后台时进程不被冻结，下载继续；仍保留断点续传，\n  极端情况进程被杀回来点「继续」即接着下。\n  > iOS 无需改动：本就用系统级后台下载（URLSessionConfiguration.background），锁屏照常下载。\n\n> 对应 iOS 1.0.11（iOS 端无代码变更，沿用上一版）。\n\n",
+  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.21/yiren-v1.0.21.apk",
+  "size": 38026166,
+  "apkSha256": "0f2d72d0301a7335f6831776fa6897a559e4a18d02d92ff2235e6a67ca5f90e5"
 }
