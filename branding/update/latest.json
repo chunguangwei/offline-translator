@@ -1,7 +1,7 @@
 {
-  "version": "1.0.19",
-  "notes": "◆ 优化\n· 新增联系邮箱：App 内「关于与许可」分区新增可点击的版权联系 / 问题反馈邮箱\n  （`chunguangwee@gmail.com`），点按直接发邮件。同步补到 README、隐私政策与 App Store 上架文档\n  （版权联系人 + bug/反馈接收邮箱）。双端对齐。\n· 校正邮箱拼写：修正 README、隐私政策（含已上线网页）中误写为 `chunguangwei@gmail.com`\n  的联系邮箱为 `chunguangwee@gmail.com`（GitHub 仓库地址不变）。\n\n> 对应 iOS 1.0.10。\n\n",
-  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.19/yiren-v1.0.19.apk",
+  "version": "1.0.20",
+  "notes": "◆ 修复\n· 提取学习单词时不再因熄屏中断：AI 提取生词是分块流式的长任务（文本越长越久），此前提取途中\n  系统会自动熄屏锁屏，锁屏后任务被系统挂起 / GPU 推理停滞，导致提取中断、半途而废。现提取期间\n  自动保持屏幕常亮，结束/停止后恢复，长文本可一次提取到完成。双端对齐（新建词本提取 +\n  词本内「加生词」提取两处入口均生效）。\n\n> 对应 iOS 1.0.11。\n> 说明：本修复针对「自动熄屏」；提取中手动按电源键锁屏，iOS 仍会挂起 App（系统级限制）。\n\n",
+  "apk": "https://github.com/chunguangwei/offline-translator/releases/download/v1.0.20/yiren-v1.0.20.apk",
   "size": 38026118,
-  "apkSha256": "d1efdab8c75538e320633f2bb27fd35e7b033b498210a123c4548709f3077182"
+  "apkSha256": "80f95619bd1468593a6ca3fbf8f447e9afcdb00a0d03e38d19614ed6e9d29c07"
 }
