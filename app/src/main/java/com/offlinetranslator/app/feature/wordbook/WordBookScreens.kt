@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -43,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,6 +70,15 @@ fun WordBooksSection(vm: WordBookViewModel = hiltViewModel()) {
     val books by vm.books.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<WordBookEntity?>(null) }
     var showImport by remember { mutableStateOf(false) }
+
+    // 提取期间保持屏幕常亮：AI 提取是分块长任务，熄屏后系统会挂起进程 / GPU 推理停滞，
+    // 导致提取中断。建库与「加生词」两处提取共用同一全局状态，故在父级统一处理一次。
+    val importUi by vm.importUi.collectAsStateWithLifecycle()
+    val keepAwakeView = LocalView.current
+    DisposableEffect(importUi.isExtracting) {
+        keepAwakeView.keepScreenOn = importUi.isExtracting
+        onDispose { keepAwakeView.keepScreenOn = false }
+    }
 
     // 删除后回列表。
     LaunchedEffect(books) {
