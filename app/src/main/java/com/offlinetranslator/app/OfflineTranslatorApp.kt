@@ -12,7 +12,6 @@ import androidx.work.NetworkType
 import androidx.work.WorkManager
 import com.offlinetranslator.app.core.i18n.LocaleManager
 import com.offlinetranslator.app.feature.learn.SrsBackfill
-import com.offlinetranslator.app.feature.models.download.ModelDownloadWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

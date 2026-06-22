@@ -8,31 +8,27 @@ import com.offlinetranslator.app.core.data.AppPreferencesRepository
 import com.offlinetranslator.app.core.data.model.LocalModel
 import com.offlinetranslator.app.core.data.model.ModelInfo
 import com.offlinetranslator.app.core.data.model.ModelStorage
-import com.offlinetranslator.app.feature.models.download.DownloadProgress
-import com.offlinetranslator.app.feature.models.download.ModelDownloader
+import com.offlinetranslator.app.feature.models.download.ModelDownloadManager
 import com.offlinetranslator.app.engine.llm.GemmaEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
- * Per-model download state, drives UI progress bar + error display.
+ * Per-model download state, drives UI progress bar + error display + notification.
  */
 data class DownloadState(
     val downloadedBytes: Long = 0L,
     val totalBytes: Long = 0L,
     val running: Boolean = false,
     val error: String? = null,
+    val displayName: String = "",
 )
 
 @HiltViewModel
@@ -40,68 +36,22 @@ class ModelsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val storage: ModelStorage,
     private val prefs: AppPreferencesRepository,
-    private val downloader: ModelDownloader,
+    private val downloadManager: ModelDownloadManager,
     private val engine: GemmaEngine,
 ) : ViewModel() {
 
     val locals: StateFlow<List<LocalModel>> = storage.locals
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _downloads = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
-    val downloads: StateFlow<Map<String, DownloadState>> = _downloads.asStateFlow()
-
-    private val jobs = mutableMapOf<String, Job>()
-
     /**
-     * Run download in viewModelScope (foreground) — bypass WorkManager whose Jobs
-     * are blocked on some Chinese OEMs (vivo OriginOS, MIUI, etc.) by aggressive
-     * background restrictions (CONSTRAINT_BACKGROUND_NOT_RESTRICTED).
-     *
-     * Trade-off: download pauses if the user kills the App. That's acceptable for
-     * an MVP — `ModelDownloader` already does HTTP Range resume, so user can just
-     * tap "继续" to resume.
+     * 下载状态来自应用级 [ModelDownloadManager]——下载跑在前台服务护住的应用级协程里，
+     * 不随本 ViewModel 销毁而中断；熄屏/切后台也继续（对齐 iOS 后台下载）。
      */
-    fun startDownload(info: ModelInfo) {
-        if (jobs[info.id]?.isActive == true) return
-        _downloads.update { it + (info.id to DownloadState(running = true)) }
-        jobs[info.id] = viewModelScope.launch {
-            downloader.download(info).collect { p ->
-                when (p) {
-                    is DownloadProgress.Connecting -> _downloads.update {
-                        it + (info.id to (it[info.id] ?: DownloadState()).copy(running = true, error = null))
-                    }
-                    is DownloadProgress.Progress -> _downloads.update {
-                        it + (info.id to DownloadState(
-                            downloadedBytes = p.downloaded,
-                            totalBytes = p.total,
-                            running = true,
-                        ))
-                    }
-                    is DownloadProgress.Completed -> _downloads.update {
-                        it + (info.id to DownloadState(
-                            downloadedBytes = info.sizeBytes,
-                            totalBytes = info.sizeBytes,
-                            running = false,
-                        ))
-                    }
-                    is DownloadProgress.Failed -> _downloads.update {
-                        it + (info.id to (it[info.id] ?: DownloadState()).copy(
-                            running = false,
-                            error = p.error,
-                        ))
-                    }
-                }
-            }
-        }
-    }
+    val downloads: StateFlow<Map<String, DownloadState>> = downloadManager.downloads
 
-    fun cancelDownload(info: ModelInfo) {
-        jobs[info.id]?.cancel()
-        jobs.remove(info.id)
-        _downloads.update {
-            it + (info.id to (it[info.id] ?: DownloadState()).copy(running = false))
-        }
-    }
+    fun startDownload(info: ModelInfo) = downloadManager.start(info)
+
+    fun cancelDownload(info: ModelInfo) = downloadManager.cancel(info)
 
     fun activate(info: ModelInfo) {
         viewModelScope.launch {
@@ -121,7 +71,7 @@ class ModelsViewModel @Inject constructor(
                 runCatching { engine.unload() }
             }
             storage.delete(info)
-            _downloads.update { it - info.id }
+            downloadManager.clear(info.id)
         }
     }
 

@@ -63,9 +63,15 @@
                 android:value="true" />
         </service>
 
-        <!-- Foreground download is handled by ModelDownloadWorker (WorkManager) -->
-        <!-- Tell WorkManager's SystemForegroundService it's allowed to run as dataSync,
-             required by Android 14+ when calling setForeground() with a typed ForegroundInfo. -->
+        <!-- 模型下载前台服务：护住进程 + 常驻进度通知，使熄屏/切后台时下载继续
+             （国产 ROM 会冻结后台进程 / 卡死 WorkManager，故用自管前台服务，
+             由 ModelDownloadManager 拉起/停止）。dataSync 类型 Android 14+ 必填。 -->
+        <service
+            android:name=".feature.models.download.ModelDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- WorkManager 的 SystemForegroundService 仍保留（其它 Worker 走前台时需要）。 -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
