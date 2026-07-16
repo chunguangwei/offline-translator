@@ -70,6 +70,7 @@ struct HistoryView: View {
                     }
                 }
             }
+            .readingWidth()
             .navigationTitle(zh ? "历史" : "History")
             .toolbar {
                 if !records.isEmpty {

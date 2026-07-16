@@ -9,6 +9,8 @@ struct ModelsView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let storage = ModelStorage.shared
+    /// 从「去下载」入口传入：打开页面后自动开始下载默认模型。
+    var autoDownload: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -43,6 +45,14 @@ struct ModelsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(zh ? "完成" : "Done") { dismiss() }
+                }
+            }
+            .onAppear {
+                if autoDownload {
+                    let model = ModelRegistry.defaultModel
+                    if !storage.isDownloaded(model) && !storage.isBundled(model) && !downloader.isDownloading(model) {
+                        downloader.download(model)
+                    }
                 }
             }
         }

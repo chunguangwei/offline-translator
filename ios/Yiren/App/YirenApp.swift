@@ -26,7 +26,7 @@ struct YirenApp: App {
         WindowGroup {
             ZStack {
                 if splashDone {
-                    RootTabView()
+                    RootView()
                         .transition(.opacity)
                 } else {
                     SplashView(onFinished: {

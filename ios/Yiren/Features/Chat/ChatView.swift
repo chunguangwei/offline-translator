@@ -12,10 +12,26 @@ struct ChatView: View {
     @State private var previewImage: UIImage?
     /// 驱动消息列表刷新（SwiftData 手动 fetch 模式）。
     @State private var refreshTick = 0
+    /// 模型缺失时顶部横幅 → 自动跳模型页下载。
+    @State private var showModels = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                if vm.isModelMissing {
+                    HStack {
+                        Text(zh ? "还没有可用的模型" : "No model available yet")
+                            .font(.subheadline)
+                        Spacer()
+                        Button(zh ? "去下载" : "Download") { showModels = true }
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.brandPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+                }
                 messageList
                 if let err = vm.errorMessage {
                     Text(err)
@@ -32,6 +48,7 @@ struct ChatView: View {
                 }
                 inputBar
             }
+            .readingWidth()
             .navigationTitle(zh ? "问答" : "Q&A")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -66,6 +83,10 @@ struct ChatView: View {
                 }
             }
             .sheet(isPresented: $showSessions) { sessionsSheet }
+            .sheet(isPresented: $showModels, onDismiss: { vm.refreshModel() }) {
+                ModelsView(autoDownload: true)
+            }
+            .onAppear { vm.refreshModel() }
             .fullScreenCover(item: $previewImage) { img in
                 FullImageViewer(image: img) { previewImage = nil }
             }
@@ -280,6 +301,7 @@ private func cachedBubbleImage(_ path: String) -> UIImage? {
 private struct MessageBubble: View {
     let msg: ChatMessage
     let onImageTap: (UIImage) -> Void
+    @Environment(\.horizontalSizeClass) private var hSize
 
     var body: some View {
         HStack {
@@ -289,7 +311,7 @@ private struct MessageBubble: View {
                     Image(uiImage: ui)
                         .resizable()
                         .scaledToFit()
-                        .frame(maxWidth: 200, maxHeight: 240)
+                        .frame(maxWidth: hSize == .regular ? 320 : 200, maxHeight: hSize == .regular ? 380 : 240)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .onTapGesture { onImageTap(ui) }
                 }

@@ -139,6 +139,7 @@ struct LearnView: View {
                     }
                 }
             }
+            .readingWidth()
             .navigationTitle(zh ? "学习" : "Learn")
             .toolbar {
                 if tab == 0 && !starred.isEmpty {

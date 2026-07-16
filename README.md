@@ -4,7 +4,7 @@
 > 翻译（文字/语音）· 问答（文字/语音/图片，多轮会话）· 历史 · 设置，
 > 零依赖 Google 服务（GMS-free），适配华为 / 荣耀等无 GMS 设备。
 
-**Android 1.0.10**（最低 Android 8.0 / API 26，arm64-v8a + armeabi-v7a）　|　**iOS 1.0.1**（最低 iOS 17，开发签名分发，上架准备中）
+**Android 1.0.21**（最低 Android 8.0 / API 26，arm64-v8a + armeabi-v7a）　|　**iOS 1.0.11**（最低 iOS 17，App Store 上架准备中）
 
 ---
 
@@ -202,8 +202,10 @@ cd ios && xcodegen generate && open Yiren.xcodeproj
 - 新增源文件后需重跑 `xcodegen generate`
 - **开发期模型随包**：把 `.litertlm` 丢进 `ios/BundledModels/`（gitignored）再构建，
   装上即用免下载；正式分发不带模型，用户应用内下载
-- 上架 App Store 需付费开发者账号；LaunchScreen 静态 / 图标无 alpha / 全离线隐私标签等
-  合规项已预埋
+- **App Store 上架**：上架素材（元数据、截图、隐私政策、PrivacyInfo.xcprivacy、审核备注中英双语）
+  已备齐于 `docs/ios-appstore-submission.md`；归档脚本 `ios/archive-appstore.sh` 一键打包。
+  审核专用构建可随包模型（`--bundle-model`），reviewer 开箱即用。
+  需付费 Apple Developer Program 账号 + Apple Distribution 证书。
 
 ---
 
@@ -305,6 +307,8 @@ ios/                                  # iOS 端（SwiftUI，与 Android 功能�
     ├── DesignSystem/BrandTheme.swift # 品牌色 + 键盘收起扩展
     ├── Engine/                       # GemmaService / PromptTemplates / AudioRecorder
     ├── Features/                     # Translate / Chat / History / Settings / Models / Splash
+    ├── en.lproj/InfoPlist.strings     # 英文权限描述（相机/麦克风/显示名）
+    ├── zh-Hans.lproj/InfoPlist.strings # 简体中文权限描述
     └── Assets.xcassets/AppIcon       # 1024 全出血图标（无 alpha）
 
 branding/

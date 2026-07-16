@@ -16,7 +16,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-TEAM="L35RLT89XN"
+TEAM="CCTFP9X3SW"
 BUNDLE_MODEL=0
 MODEL_SRC="/tmp/gemma-4-E2B-it.litertlm"
 

@@ -70,3 +70,4 @@ Thumbs.db
 /ios/BundledModels/*
 !/ios/BundledModels/.gitkeep
 appstore-screenshots/
+.codeflicker/

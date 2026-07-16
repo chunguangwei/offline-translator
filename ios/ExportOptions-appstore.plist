@@ -6,12 +6,12 @@
 	<key>method</key>
 	<string>app-store</string>
 	<key>teamID</key>
-	<string>L35RLT89XN</string>
+	<string>CCTFP9X3SW</string>
 	<!-- 自动管理签名：需付费账号 + Apple Distribution 证书 + App Store 描述文件。 -->
 	<key>signingStyle</key>
 	<string>automatic</string>
 	<key>uploadSymbols</key>
-	<true/>
+	<false/>
 	<key>destination</key>
 	<string>export</string>
 	<key>stripSwiftSymbols</key>

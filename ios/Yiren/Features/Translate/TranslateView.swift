@@ -31,6 +31,7 @@ struct TranslateView: View {
                     }
                 }
                 .padding(20)
+                .readingWidth()
             }
             .scrollDismissesKeyboard(.interactively)
             // 点输入框外的空白处收起键盘（卡片/按钮自身交互不受影响）。
@@ -38,7 +39,7 @@ struct TranslateView: View {
             .background(Color(.systemGroupedBackground))
             .onAppear { vm.refreshModel() }
             .sheet(isPresented: $showModels, onDismiss: { vm.refreshModel() }) {
-                ModelsView()
+                ModelsView(autoDownload: true)
             }
             .sheet(item: $shareImage) { img in
                 ActivityView(items: [img])

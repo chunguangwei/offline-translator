@@ -31,11 +31,24 @@ final class ChatViewModel: ObservableObject {
     /// 待发送的图片附件（发送即清，与主流 IM 一致）。
     @Published var attachedImage: UIImage?
     @Published var errorMessage: String?
+    @Published var isModelMissing = false
 
     private let gemma = GemmaService.shared
     private let recorder = AudioRecorder.shared
     private var generateTask: Task<Void, Never>?
     private var context: ModelContext { DataStore.context }
+
+    // MARK: - 模型状态
+
+    func refreshModel() {
+        Task {
+            switch await gemma.ensureLoaded() {
+            case .success: isModelMissing = false
+            case .failure(let f):
+                if case .modelMissing = f { isModelMissing = true }
+            }
+        }
+    }
 
     // MARK: - 会话管理
 
@@ -154,12 +167,14 @@ final class ChatViewModel: ObservableObject {
             switch await gemma.ensureLoaded() {
             case .failure(let f):
                 if case .modelMissing = f {
-                    errorMessage = PromptTemplates.isZhUi ? "请先到「设置 → 模型管理」下载模型" : "Download a model in Settings first"
+                    isModelMissing = true
+                    errorMessage = nil
                 } else if case .initFailed(let m) = f {
                     errorMessage = m
                 }
                 return
             case .success:
+                isModelMissing = false
                 break
             }
             if image != nil && !gemma.visionEnabled {

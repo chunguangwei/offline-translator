@@ -1,0 +1,4 @@
+/* Yiren — English (en) InfoPlist localizations */
+"NSCameraUsageDescription" = "Camera translation requires camera access. Photos are recognized and translated on-device and never uploaded.";
+"NSMicrophoneUsageDescription" = "Voice input requires microphone access. Audio is transcribed to text on-device and never uploaded.";
+"CFBundleDisplayName" = "Yiren";
