@@ -57,7 +57,7 @@
 > · 单词本：粘贴或导入生词，AI 自动提取建库；可编辑、添加、一键去重
 > · 间隔重复记忆（SRS）：每日到期复习、连续打卡、错题本、本地提醒，科学记词
 > · 翻译历史与收藏：随时回看、星标收藏纳入复习
-> · 备份与还原：一个文件搬走全部数据，换手机也不丢；安卓与 iPhone 可互导
+> · 备份与还原：一个文件搬走全部数据，换手机也不丢
 >
 > **隐私优先**
 > 译人不需要注册、不收集个人信息、不含广告与追踪。AI 推理全在设备本地完成。
@@ -80,7 +80,7 @@
 > · Vocabulary books — paste or import words; AI extracts entries automatically; edit, add, one-tap dedup
 > · Spaced-repetition review (SRS) — daily due cards, streaks, a "hard words" deck, and local reminders
 > · History & favorites — revisit translations, star them into your review pool
-> · Backup & restore — move all your data in a single file when switching phones; Android ⇄ iPhone compatible
+> · Backup & restore — move all your data in a single file when switching phones
 >
 > **Privacy first**
 > No account, no personal data collection, no ads, no tracking. All AI inference happens on-device.
