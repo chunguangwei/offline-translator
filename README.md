@@ -90,7 +90,7 @@
 | DI | **Hilt 2.52** + KSP |
 | 异步 / 流 | Kotlin Coroutines + Flow + `callbackFlow` + `buffer(64)` 背压 |
 | 持久化 | DataStore（偏好设置）+ Room（聊天历史） |
-| 后台任务 | WorkManager 2.9.1（模型下载） |
+| 后台任务 | WorkManager 2.9.1（学习每日提醒）；模型下载为自管前台服务（国产 ROM 防冻结） |
 | 网络 | OkHttp + Range 断点续传 |
 | 国际化 | AppCompat `AppCompatDelegate.setApplicationLocales` — 兼容 API 26–35 |
 | Activity 基类 | `AppCompatActivity`（Hilt `@AndroidEntryPoint` 兼容） |
@@ -247,47 +247,46 @@ app/src/main/
 │   ├── MainActivity.kt               # AppCompatActivity + Hilt + Compose setContent
 │   ├── OfflineTranslatorApp.kt       # @HiltAndroidApp Application + WorkManager init
 │   ├── di/
-│   │   └── AppModule.kt              # Hilt provides（DB / Engine / Recorder / Repository）
+│   │   └── AppModule.kt              # Hilt provides（DB / Engine / Recorder 等）
 │   ├── core/
 │   │   ├── data/
 │   │   │   ├── AppPreferences.kt     # DataStore 包装（主题 / 后端 / 语言偏好）
-│   │   │   ├── db/AppDatabase.kt     # Room 数据库（聊天历史）
+│   │   │   ├── db/AppDatabase.kt     # Room 数据库（会话 / 翻译历史 / 单词本 / SRS 卡片）
 │   │   │   └── model/
-│   │   │       ├── ModelInfo.kt      # 模型描述（id / size / url / supportsAudio...）
-│   │   │       ├── ModelRegistry.kt  # 内置模型清单（E2B / E4B，supportsAudio=true）
+│   │   │       ├── ModelRegistry.kt  # ModelInfo + 内置模型清单（E2B / E4B，supportsAudio=true）
 │   │   │       └── ModelStorage.kt   # 磁盘路径 / 完整性校验
 │   │   ├── designsystem/
-│   │   │   ├── components/
-│   │   │   │   ├── GlassCard.kt         # 玻璃拟态卡片
-│   │   │   │   ├── WaveformBars.kt      # 响应式波形（包络跟随 + 60Hz + glow）
-│   │   │   │   └── VoiceProcessingIndicator.kt  # 三色轨道动画（转录等待）
-│   │   │   └── theme/                   # Color / Type / Theme（浅色 / 深色）
-│   │   ├── i18n/LocaleManager.kt     # AppCompatDelegate per-app locale 封装
-│   │   └── util/                     # Bitmap 转 PNG bytes、bitmapOf 等工具
+│   │   │   ├── components/           # GlassCard / WaveformBars / MarkdownText /
+│   │   │   │                         #   SiriMicOrb / ThinkingDots / VoiceProcessingIndicator
+│   │   │   └── theme/                # Color / Type / Theme（浅色 / 深色）
+│   │   └── i18n/LocaleManager.kt     # AppCompatDelegate per-app locale 封装
 │   ├── engine/
 │   │   ├── llm/
-│   │   │   ├── GemmaEngine.kt        # LiteRT-LM 封装（文本 / 图像 / 音频，GPU→CPU fallback）
-│   │   │   ├── EngineState.kt        # IDLE / LOADING / READY / ERROR / MODEL_MISSING
-│   │   │   └── PromptTemplates.kt    # Gemma 4 chat template + stop tokens
-│   │   ├── audio/PcmAudioRecorder.kt # AudioRecord，16kHz PCM16 mono + amplitude Flow
-│   │   ├── storage/ModelStorage.kt   # 模型文件 I/O
-│   │   └── network/ModelDownloader.kt # OkHttp Range 续传 + 多镜像切换
+│   │   │   ├── GemmaEngine.kt        # LiteRT-LM 封装（文本 / 图像 / 音频，GPU→CPU fallback；
+│   │   │   │                         #   含 EngineState：IDLE / LOADING / READY / ERROR / MODEL_MISSING）
+│   │   │   ├── PromptTemplates.kt    # Gemma 4 提示词模板 + stop tokens
+│   │   │   └── ContextWindow.kt      # 上下文窗口 / 摘要压缩辅助
+│   │   ├── audio/                    # PcmAudioRecorder（16kHz PCM16 mono）+ WavUtils
+│   │   └── image/ImageUtils.kt       # Bitmap 处理工具
 │   └── feature/
-│       ├── shell/                    # AppShell + BottomNavigation + Route 定义
-│       ├── translate/                # 翻译页 Screen + ViewModel
-│       ├── chat/                     # 对话页 Screen + ViewModel（含麦克风 Gemma ASR）
-│       ├── voice/                    # 语音页 Screen + ViewModel（端到端 Gemma 音频）
-│       ├── vision/                   # 图像页 Screen + ViewModel
-│       ├── models/                   # 模型管理 Screen + ViewModel + DownloadWorker
-│       └── settings/                 # 设置页 Screen + ViewModel（语言 / 主题 / 后端）
+│       ├── shell/                    # AppShell + 底部 5-Tab 导航 + Route 定义
+│       ├── splash/                   # 品牌启动页（眨眼 logo + splash.json 远程换图）
+│       ├── translate/                # 翻译 Tab（文字 / 语音 / 拍照 + 译文分享卡片）
+│       ├── chat/                     # 问答 Tab（多轮会话 / 角色预设 / 图片问答 / 语音输入）
+│       ├── learn/                    # 学习 Tab（SRS 调度 / 错题本 / 每日提醒 Worker）
+│       ├── wordbook/                 # 单词本（AI 提取建库 / 编辑添加 / 一键去重）
+│       ├── history/                  # 历史 Tab（翻译记录 / 星标生词）
+│       ├── models/                   # 模型管理 Tab
+│       │   └── download/             # 自管前台服务 + OkHttp Range 续传 + 多镜像切换
+│       ├── settings/                 # 设置 Tab（语言 / 主题 / 后端 / 备份还原入口）
+│       ├── backup/                   # 备份与还原（跨平台格式编解码，安卓 ↔ iOS 互导）
+│       └── update/                   # 应用内检查更新（GitHub Release + 哈希校验）
 └── res/
     ├── drawable/                     # 矢量图（ic_launcher_foreground 等）
     ├── mipmap-anydpi-v26/            # 自适应图标
-    ├── values/strings.xml            # 中文字符串（默认）
+    ├── values/strings.xml            # 中文字符串（默认）/ colors / themes
     ├── values-en/strings.xml         # English 字符串
-    ├── values/themes.xml             # AppCompat 主题（浅色）
     ├── values-night/themes.xml       # 深色模式主题
-    ├── values/colors.xml             # 品牌色系
     └── xml/
         ├── file_paths.xml            # FileProvider（相机临时文件）
         ├── locales_config.xml        # 支持语言清单（zh-CN / en）
@@ -299,16 +298,24 @@ app/src/main/
 ios/                                  # iOS 端（SwiftUI，与 Android 功能对齐）
 ├── project.yml                       # xcodegen 工程声明（.xcodeproj 不入库）
 ├── 需要你做的.md                      # 真机/验收步骤
+├── archive-appstore.sh               # App Store 一键归档脚本（--bundle-model 可随包模型）
+├── ExportOptions-appstore.plist      # App Store 导出配置
 ├── BundledModels/                    # 开发期"模型随包"开关（gitignored，平时仅 .gitkeep）
 ├── LiteRTLM/                         # 官方 LiteRT-LM Swift 封装 + CLiteRTLM.xcframework
 └── Yiren/
     ├── App/YirenApp.swift            # 入口：启动页→主界面 + SwiftData 容器 + 后台下载挂点
+    ├── Shell/                        # RootView / RootTabView / RootSplitView（iPad 分屏适配）
     ├── Data/Store.swift              # SwiftData：会话/消息/翻译历史
-    ├── DesignSystem/BrandTheme.swift # 品牌色 + 键盘收起扩展
+    ├── DesignSystem/                 # BrandTheme 品牌色 + Layout + 键盘收起扩展
     ├── Engine/                       # GemmaService / PromptTemplates / AudioRecorder
-    ├── Features/                     # Translate / Chat / History / Settings / Models / Splash
+    ├── Models/                       # ModelRegistry / ModelStorage / ModelDownloader（后台 URLSession）
+    ├── Features/                     # Translate / Chat / Learn / WordBook / History /
+    │                                 #   Models / Settings / Splash / Backup
+    ├── Debug/TranslateSmokeTest.swift # 翻译冒烟测试
     ├── en.lproj/InfoPlist.strings     # 英文权限描述（相机/麦克风/显示名）
     ├── zh-Hans.lproj/InfoPlist.strings # 简体中文权限描述
+    ├── PrivacyInfo.xcprivacy         # App Store 隐私清单
+    ├── Yiren.entitlements            # 4GB 内存上限等 entitlement
     └── Assets.xcassets/AppIcon       # 1024 全出血图标（无 alpha）
 
 branding/
@@ -360,29 +367,29 @@ branding/
 | `MainActivity.kt` | AppCompatActivity + Compose setContent（国际化基础） |
 | `OfflineTranslatorApp.kt` | Application 入口 |
 | `di/AppModule.kt` | Hilt 模块 |
-| `core/data/model/ModelInfo.kt` | 模型数据类 |
-| `core/data/model/ModelRegistry.kt` | 内置模型清单（含 `supportsAudio = true`） |
+| `core/data/model/ModelRegistry.kt` | ModelInfo + 内置模型清单（含 `supportsAudio = true`） |
 | `core/data/model/ModelStorage.kt` | 文件路径、完整性校验 |
 | `core/data/db/` | Room Entity + DAO + Database |
 | `core/data/AppPreferences.kt` | DataStore 包装 |
-| `core/designsystem/components/GlassCard.kt` | 玻璃卡片 |
-| `core/designsystem/components/WaveformBars.kt` | 响应式波形 |
-| `core/designsystem/components/VoiceProcessingIndicator.kt` | 转录等待动画 |
+| `core/designsystem/components/` | GlassCard / WaveformBars / MarkdownText / SiriMicOrb / ThinkingDots / VoiceProcessingIndicator |
 | `core/designsystem/theme/` | Color / Type / Theme |
 | `core/i18n/LocaleManager.kt` | 语言切换封装 |
-| `core/util/` | 工具函数 |
-| `engine/llm/GemmaEngine.kt` | LiteRT-LM 核心（文本 / 图像 / 音频） |
+| `engine/llm/GemmaEngine.kt` | LiteRT-LM 核心（文本 / 图像 / 音频；含 EngineState） |
 | `engine/llm/PromptTemplates.kt` | Gemma 提示词模板 |
-| `engine/audio/PcmAudioRecorder.kt` | 麦克风采集 |
-| `engine/storage/` | 模型文件管理 |
-| `engine/network/` | OkHttp 多镜像下载 |
-| `feature/shell/` | AppShell + 底部导航 + 路由 |
-| `feature/translate/` | 翻译 Tab |
-| `feature/chat/` | 对话 Tab（含麦克风 ASR） |
-| `feature/voice/` | 语音 Tab（端到端 Gemma 音频） |
-| `feature/vision/` | 图像 Tab |
-| `feature/models/` | 模型管理 Tab + WorkManager |
+| `engine/llm/ContextWindow.kt` | 上下文窗口 / 摘要压缩辅助 |
+| `engine/audio/` | PcmAudioRecorder + WavUtils（麦克风采集与 WAV 封装） |
+| `engine/image/ImageUtils.kt` | Bitmap 处理工具 |
+| `feature/shell/` | AppShell + 底部 5-Tab 导航 + 路由 |
+| `feature/splash/` | 品牌启动页 |
+| `feature/translate/` | 翻译 Tab（文字 / 语音 / 拍照 + 分享卡片） |
+| `feature/chat/` | 问答 Tab（多轮会话 / 角色预设 / 图片问答 / 语音输入） |
+| `feature/learn/` | 学习 Tab（SRS 调度 / 错题本 / 每日提醒） |
+| `feature/wordbook/` | 单词本（AI 提取建库 / 编辑添加 / 去重） |
+| `feature/history/` | 历史 Tab |
+| `feature/models/` | 模型管理 Tab + 前台服务下载（`download/`） |
 | `feature/settings/` | 设置 Tab（语言 / 主题 / 后端） |
+| `feature/backup/` | 备份与还原 |
+| `feature/update/` | 应用内检查更新 |
 
 #### 资源：`app/src/main/res/`
 
