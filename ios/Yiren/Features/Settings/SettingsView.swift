@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @AppStorage("themeMode") private var themeMode = "system"
     @AppStorage("backendPref") private var backendPref = "AUTO"
-    @AppStorage("modelSourcePref") private var modelSource = "CN_FIRST"
+    @AppStorage("modelSourcePref") private var modelSource = ModelSourcePref.defaultForRegion.rawValue
     @AppStorage("customMirrorBase") private var customMirrorBase = ""
     @AppStorage("reminderEnabled") private var reminderEnabled = false
     @AppStorage("reminderHour") private var reminderHour = 20

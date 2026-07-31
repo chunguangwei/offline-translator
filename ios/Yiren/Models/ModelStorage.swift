@@ -48,6 +48,15 @@ final class ModelStorage {
 
     func delete(_ model: ModelInfo) {
         try? FileManager.default.removeItem(at: fileURL(for: model))
+        // 连带清理分块下载残留（part / resumeData）。
+        for i in 0..<8 {
+            try? FileManager.default.removeItem(
+                at: modelsDir.appendingPathComponent("\(model.fileName).chunk\(i)"))
+            for s in 0..<3 {
+                try? FileManager.default.removeItem(
+                    at: modelsDir.appendingPathComponent("\(model.fileName).chunk\(i).resume\(s)"))
+            }
+        }
         if activeModelId == model.id { activeModelId = nil }
     }
 

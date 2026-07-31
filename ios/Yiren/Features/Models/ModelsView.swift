@@ -6,11 +6,17 @@ struct ModelsView: View {
     // 共享单例：background session identifier 全 App 唯一，且锁屏/重启后能接回任务。
     @ObservedObject private var downloader = ModelDownloader.shared
     @State private var refreshTick = 0 // 下载完/删除后驱动行状态刷新
+    /// 待确认下载的模型 —— App Store 4.2.3(ii)：下载额外资源前必须明示大小并由用户选择确认。
+    @State private var pendingDownload: ModelInfo?
     @Environment(\.dismiss) private var dismiss
 
     private let storage = ModelStorage.shared
-    /// 从「去下载」入口传入：打开页面后自动开始下载默认模型。
+    /// 从「去下载」入口传入：打开页面后弹出默认模型的下载确认（不静默开下）。
     var autoDownload: Bool = false
+
+    private static func sizeText(_ model: ModelInfo) -> String {
+        ByteCountFormatter.string(fromByteCount: model.sizeBytes, countStyle: .file)
+    }
 
     var body: some View {
         NavigationStack {
@@ -23,7 +29,7 @@ struct ModelsView: View {
                             isDownloaded: storage.isDownloaded(model),
                             isBundled: storage.isBundled(model),
                             isActive: storage.activeModelId == model.id,
-                            onDownload: { downloader.download(model) },
+                            onDownload: { pendingDownload = model },
                             onCancel: { downloader.cancel(model) },
                             onActivate: {
                                 storage.activeModelId = model.id
@@ -51,9 +57,24 @@ struct ModelsView: View {
                 if autoDownload {
                     let model = ModelRegistry.defaultModel
                     if !storage.isDownloaded(model) && !storage.isBundled(model) && !downloader.isDownloading(model) {
-                        downloader.download(model)
+                        pendingDownload = model // 先弹确认（含大小），用户点「下载」才开始
                     }
                 }
+            }
+            .alert(
+                zh ? "下载模型" : "Download Model",
+                isPresented: Binding(
+                    get: { pendingDownload != nil },
+                    set: { if !$0 { pendingDownload = nil } }
+                ),
+                presenting: pendingDownload
+            ) { model in
+                Button(zh ? "下载" : "Download") { downloader.download(model) }
+                Button(zh ? "取消" : "Cancel", role: .cancel) {}
+            } message: { model in
+                Text(zh
+                     ? "\(model.displayName)，大小 \(Self.sizeText(model))。建议连接 Wi-Fi 下载；下载完成后自动启用，推理全程离线。"
+                     : "\(model.displayName) · \(Self.sizeText(model)). Wi-Fi recommended. Auto-activated after download; inference is fully offline.")
             }
         }
     }
